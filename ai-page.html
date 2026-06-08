@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>门诊病历演示</title>
+  <link rel="stylesheet" href="./css/medical.css">
+  <script type="module" src="./js/medical.js"></script>
+  <script  src="./js/crypto-js.min.js"></script>
+  <script  src="./js/xf-voice-dictation.js"></script>
+</head>
+<body>
+  <iframe id="editor" src="./editor.html"></iframe>
+  <div id="assistant">
+    <label>AI医生</label>
+    <div>    
+      <button id="startBtn">浏览器语音识别</button>
+      <button id="xufeiRecord">讯飞语音识别</button>
+      <button id="stopBtn" disabled>停止</button>
+    </div>
+    <textarea id="output" placeholder=
+"
+1.浏览器语音支持微软Edge，苹果Safari，谷歌Chrom浏览器(须翻墙)，其他浏览器请使用讯飞语音(60秒)；
+
+2.请以普通话进行医患对话,比如“发热了两天，头不是很痛，昨天夜里拉肚子拉了一宿，嘴巴很干，喝了不少水但是还是觉得渴，感觉好不了，来看看医生开点药了... ”；
+
+3.选择不同语言大模型，回答速度和准确率会有差异；
+
+3.下方主诉等按钮可以同时启用，暂无前后逻辑关联；
+
+"
+></textarea>
+    <div style="margin: 10px;">
+      <span>选择AI模型：</span>
+      <select id="model">
+        <option value="qwen-plus-latest">阿里千问-Plus</option>
+        <option value="qwen-turbo-latest">阿里千问-Turbo</option>
+        <option value="qwen-max-latest">阿里千问-Max</option>
+        <option value="deepseek-r1">DeepSeek-R1</option>
+      </select>
+      <span style="font-size: x-small; text-align: right;">已回答<span id="count"></span>次</span>
+    </div>
+    <div>
+      <button action="chief_complaint" to="pat_appeal">主诉</button>
+      <button action="history_of_present_illness" to="pat_now_history">现病史</button>
+      <button action="past_history" to="pat_past_history">既往史</button>
+      <button action="allergy_history" to="pat_allergy_history">过敏史</button>
+      <button action="diagnosis" to="diagnosis">诊断</button>
+      <button action="medication" to="presc">处方</button>
+      <button action="treatment_plan" to="advice">建议</button>
+    </div>
+  </div>
+</body>
+</html>
