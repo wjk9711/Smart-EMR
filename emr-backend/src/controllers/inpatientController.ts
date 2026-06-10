@@ -896,6 +896,15 @@ export const assignPatientsToAllUsers = async (req: AuthRequest, res: Response) 
           const newUniqueKey = await generateUniqueKey('inpatient_patients')
           console.log(`    - 患者KEY: ${newUniqueKey}`)
           
+          // 生成唯一的身份证号（在原始身份证号后添加时间戳和随机数）
+          const timestamp = Date.now().toString().slice(-6) // 取后6位
+          const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0')
+          const newIdCard = originalPatient.idCard 
+            ? `${originalPatient.idCard}_${timestamp}${random}`
+            : null // 如果原始身份证号为空，则保持为空
+          
+          console.log(`    - 新身份证号: ${newIdCard || '(空)'}`)
+          
           // 复制患者数据（完全独立，不记录来源）
           console.log(`    - 创建副本患者...`)
           const copiedPatient = await InpatientPatient.create({
@@ -903,7 +912,7 @@ export const assignPatientsToAllUsers = async (req: AuthRequest, res: Response) 
             gender: originalPatient.gender,
             birthDate: originalPatient.birthDate,
             age: originalPatient.age,
-            idCard: originalPatient.idCard,
+            idCard: newIdCard, // 使用新生成的身份证号
             phone: originalPatient.phone,
             address: originalPatient.address,
             inpatientNo: newInpatientNo, // 新生成的住院号
