@@ -5,6 +5,7 @@ class InpatientRecord extends Model {
   public id!: number
   public patientId!: number
   public caseNo!: string
+  public uniqueKey?: string // 病案唯一标识（13位随机字符串）
   public recordType!: string
   public content!: string
   public doctorId!: number
@@ -15,6 +16,7 @@ class InpatientRecord extends Model {
   public qualityComment?: string
   public submittedAt?: Date
   public reviewedAt?: Date
+  public sourceRecordId?: number // 来源病案ID（如果是复制的）
   public createdAt!: Date
   public updatedAt!: Date
 }
@@ -35,6 +37,12 @@ InpatientRecord.init(
       type: DataTypes.STRING(50),
       allowNull: false,
       comment: '病案号（与住院号一致）',
+    },
+    uniqueKey: {
+      type: DataTypes.STRING(13),
+      allowNull: true,
+      unique: true,
+      comment: '病案唯一标识（13位随机字符串）',
     },
     recordType: {
       type: DataTypes.ENUM('admission', 'progress', 'discharge', 'operation', 'home_page', 'other'),
@@ -90,12 +98,28 @@ InpatientRecord.init(
       allowNull: true,
       comment: '审核时间',
     },
+    sourceRecordId: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      comment: '来源病案ID（如果是复制的）',
+      references: {
+        model: 'inpatient_records',
+        key: 'id',
+      },
+      onDelete: 'SET NULL',
+    },
   },
   {
     sequelize,
     tableName: 'inpatient_records',
     timestamps: true,
     comment: '住院病案表',
+    indexes: [
+      {
+        fields: ['source_record_id'],
+        name: 'idx_source_record',
+      },
+    ],
   }
 )
 

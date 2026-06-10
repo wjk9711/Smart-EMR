@@ -71,3 +71,15 @@ export const reviewRecord = (id: number, data: { result: 'passed' | 'rejected'; 
 export const getTeacherList = () => {
   return request.get('/inpatient/teachers')
 }
+
+// ==================== 患者下发功能 API ====================
+
+// 管理员下发患者给所有非管理员用户
+export const assignPatientsToAllUsers = (data: { patientIds: number[]; isTemplate?: boolean }) => {
+  return request.post('/inpatient/patients/assign', data)
+}
+
+// 切换患者的模板状态
+export const togglePatientTemplate = (patientId: number, isTemplate: boolean) => {
+  return request.put(`/inpatient/patients/${patientId}/toggle-template`, { isTemplate })
+}

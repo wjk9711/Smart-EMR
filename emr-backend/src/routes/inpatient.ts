@@ -16,6 +16,9 @@ import {
   getPendingReviewRecords,
   reviewRecord,
   getTeacherList,
+  // 新增：患者下发功能
+  assignPatientsToAllUsers,
+  togglePatientTemplate,
 } from '../controllers/inpatientController'
 import { checkICDCode } from '../controllers/icdCodeController'
 
@@ -27,6 +30,10 @@ router.get('/patients/:id', authenticate, getInpatientPatient)
 router.post('/patients', authenticate, createInpatientPatient)
 router.put('/patients/:id', authenticate, updateInpatientPatient)
 router.delete('/patients/:id', authenticate, deleteInpatientPatient)
+
+// 患者下发功能路由
+router.post('/patients/assign', authenticate, assignPatientsToAllUsers)
+router.put('/patients/:patientId/toggle-template', authenticate, togglePatientTemplate)
 
 // 住院病案相关路由
 router.get('/records', authenticate, getInpatientRecords)

@@ -5,6 +5,7 @@ import OutpatientRecord from './OutpatientRecord'
 import Template from './Template'
 import InpatientPatient from './InpatientPatient'
 import InpatientRecord from './InpatientRecord'
+import PatientAssignment from './PatientAssignment'
 
 // 定义模型关联
 User.hasMany(Template, { foreignKey: 'creatorId', as: 'templates' })
@@ -37,6 +38,11 @@ InpatientRecord.belongsTo(User, { foreignKey: 'doctorId', as: 'doctor' })
 User.hasMany(InpatientRecord, { foreignKey: 'teacherId', as: 'reviewedRecords' })
 InpatientRecord.belongsTo(User, { foreignKey: 'teacherId', as: 'teacher' })
 
+// 患者分配关联
+PatientAssignment.belongsTo(InpatientPatient, { foreignKey: 'patientId', as: 'patient' })
+PatientAssignment.belongsTo(User, { foreignKey: 'userId', as: 'user' })
+PatientAssignment.belongsTo(User, { foreignKey: 'assignedBy', as: 'assigner' })
+
 export {
   User,
   Patient,
@@ -45,4 +51,5 @@ export {
   Template,
   InpatientPatient,
   InpatientRecord,
+  PatientAssignment,
 }

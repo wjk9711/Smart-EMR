@@ -11,6 +11,7 @@ class InpatientPatient extends Model {
   public phone!: string
   public address!: string
   public inpatientNo!: string
+  public uniqueKey?: string // 患者唯一标识（13位随机字符串）
   public department!: string
   public bedNo!: string
   public admissionDate!: string
@@ -18,6 +19,7 @@ class InpatientPatient extends Model {
   public status!: string // admitted, discharged, transferred
   public diagnosis!: string
   public doctorId?: number // 创建该患者的医生ID
+  public sourcePatientId?: number // 来源患者ID（如果是复制的）
   public createdAt!: Date
   public updatedAt!: Date
 }
@@ -68,8 +70,14 @@ InpatientPatient.init(
     inpatientNo: {
       type: DataTypes.STRING(50),
       allowNull: false,
-      unique: true,
+      // unique: true, // 移除唯一约束，允许住院号重复（教学系统模板分发）
       comment: '住院号',
+    },
+    uniqueKey: {
+      type: DataTypes.STRING(13),
+      allowNull: true,
+      unique: true,
+      comment: '患者唯一标识（13位随机字符串）',
     },
     department: {
       type: DataTypes.STRING(100),
@@ -110,12 +118,28 @@ InpatientPatient.init(
         key: 'id',
       },
     },
+    sourcePatientId: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      comment: '来源患者ID（如果是复制的）',
+      references: {
+        model: 'inpatient_patients',
+        key: 'id',
+      },
+      onDelete: 'SET NULL',
+    },
   },
   {
     sequelize,
     tableName: 'inpatient_patients',
     timestamps: true,
     comment: '住院患者表',
+    indexes: [
+      {
+        fields: ['source_patient_id'],
+        name: 'idx_source_patient',
+      },
+    ],
   }
 )
 

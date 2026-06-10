@@ -1,7 +1,8 @@
 import { Request, Response } from 'express'
-import { InpatientPatient, InpatientRecord } from '../models'
+import { InpatientPatient, InpatientRecord, PatientAssignment, User } from '../models'
 import { success, error } from '../utils/response'
 import { AuthRequest } from '../middleware/auth'
+import { Op } from 'sequelize'
 
 // 病案类型名称映射
 const getRecordTypeName = (recordType: string): string => {
@@ -35,14 +36,39 @@ export const getInpatientPatients = async (req: AuthRequest, res: Response) => {
     
     const whereCondition: any = {}
     
-    // 数据隔离：
-    // - 学生：只能查看自己创建的患者
-    // - 教师：可以查看所有患者（用于教学和质控）
-    // - 管理员：可以查看所有患者
-    if (currentUser.roleType === 'student') {
+    // 数据隔离优化：
+    // - 学生：只能查看自己创建的患者 + 管理员下发的患者
+    // - 教师：只能查看自己创建的患者 + 管理员下发的患者
+    // - 管理员：只能查看自己创建的患者（不能看到其他用户的病人）
+    
+    let patientIds: number[] = []
+    
+    if (currentUser.roleType === 'admin') {
+      // 管理员只能看到自己创建的患者
       whereCondition.doctorId = currentUser.id
+    } else {
+      // 学生和教师：查看自己创建的 + 被分配的副本
+      const assignments = await PatientAssignment.findAll({
+        where: { userId: currentUser.id },
+        attributes: ['copiedPatientId'], // 获取副本患者ID
+      })
+      
+      // 过滤掉null值（可能有些分配记录没有copiedPatientId）
+      const copiedPatientIds = assignments
+        .map(a => a.copiedPatientId)
+        .filter(id => id !== null) as number[]
+      
+      if (copiedPatientIds.length > 0) {
+        // 使用 OR 条件：doctorId = currentUser.id OR id IN (copiedPatientIds)
+        whereCondition[Op.or] = [
+          { doctorId: currentUser.id },
+          { id: { [Op.in]: copiedPatientIds } }
+        ]
+      } else {
+        // 没有被分配的患者，只显示自己创建的
+        whereCondition.doctorId = currentUser.id
+      }
     }
-    // 教师和管理员不限制 doctorId，可以查看所有患者
     
     if (name) whereCondition.name = { like: `%${name}%` }
     if (inpatientNo) whereCondition.inpatientNo = { like: `%${inpatientNo}%` }
@@ -56,10 +82,35 @@ export const getInpatientPatients = async (req: AuthRequest, res: Response) => {
       order: [['createdAt', 'DESC']],
     })
     
+    // 为每个患者添加isTemplate标记（仅对非管理员用户）
+    let patientsWithTemplate = rows
+    if (currentUser.roleType !== 'admin' && patientIds.length > 0) {
+      const templateAssignments = await PatientAssignment.findAll({
+        where: {
+          userId: currentUser.id,
+          patientId: patientIds,
+        },
+        attributes: ['patientId', 'isTemplate'],
+      })
+      
+      const templateMap = new Map<number, boolean>()
+      templateAssignments.forEach(assignment => {
+        templateMap.set(assignment.patientId, assignment.isTemplate)
+      })
+      
+      patientsWithTemplate = rows.map(patient => {
+        const patientData = patient.toJSON()
+        return {
+          ...patientData,
+          isTemplate: templateMap.get(patient.id) || false,
+        }
+      })
+    }
+    
     res.json({
       code: 200,
       data: {
-        list: rows,
+        list: patientsWithTemplate,
         total: count,
         page: parseInt(page as string),
         pageSize: parseInt(pageSize as string),
@@ -67,6 +118,7 @@ export const getInpatientPatients = async (req: AuthRequest, res: Response) => {
       message: '获取成功',
     })
   } catch (err: any) {
+    console.error('Get inpatient patients error:', err)
     return error(res, 500, err.message)
   }
 }
@@ -97,9 +149,24 @@ export const createInpatientPatient = async (req: AuthRequest, res: Response) =>
     const currentUser = req.user!
     
     // 自动关联当前医生（数据隔离）
+    // 注意：排除 sourcePatientId，新创建的患者不应该有来源
+    const { sourcePatientId, inpatientNo: requestedInpatientNo, ...restData } = req.body
+    
+    // 处理住院号：如果未提供，则自动生成（允许重复）
+    let finalInpatientNo = requestedInpatientNo
+    
+    if (!finalInpatientNo) {
+      // 未提供住院号，自动生成（现在可以重复，仅作为显示用途）
+      finalInpatientNo = await generateUniqueInpatientNo()
+    }
+    // 注意：不再检查住院号是否已存在，因为教学系统中住院号可以重复
+    
     const patientData = {
-      ...req.body,
+      ...restData,
+      inpatientNo: finalInpatientNo,
+      uniqueKey: await generateUniqueKey('inpatient_patients'), // 生成唯一KEY
       doctorId: currentUser.id,
+      sourcePatientId: null, // 明确设置为null
     }
     
     const patient = await InpatientPatient.create(patientData)
@@ -109,6 +176,7 @@ export const createInpatientPatient = async (req: AuthRequest, res: Response) =>
       message: '创建成功',
     })
   } catch (err: any) {
+    console.error('Create inpatient patient error:', err)
     return error(res, 500, err.message)
   }
 }
@@ -123,34 +191,65 @@ export const updateInpatientPatient = async (req: Request, res: Response) => {
       return error(res, 404, '患者不存在')
     }
     
-    await patient.update(req.body)
+    // 不允许修改 sourcePatientId
+    const updateData = { ...req.body }
+    delete updateData.sourcePatientId
+    
+    await patient.update(updateData)
     res.json({
       code: 200,
       data: patient,
       message: '更新成功',
     })
   } catch (err: any) {
+    console.error('Update inpatient patient error:', err)
     return error(res, 500, err.message)
   }
 }
 
 // 删除住院患者
-export const deleteInpatientPatient = async (req: Request, res: Response) => {
+export const deleteInpatientPatient = async (req: AuthRequest, res: Response) => {
   try {
+    const currentUser = req.user!
     const { id } = req.params
+    
     const patient = await InpatientPatient.findByPk(id)
     
     if (!patient) {
       return error(res, 404, '患者不存在')
     }
     
+    // 权限检查：只能删除自己创建的患者
+    if (patient.doctorId !== currentUser.id) {
+      return error(res, 403, '无权操作：只能删除自己创建的患者')
+    }
+    
+    // 注意：下发后的患者是完全独立的副本，没有依赖关系
+    // 每个用户可以独立删除自己的患者，不影响其他人
+    
+    // 删除相关的病案
+    await InpatientRecord.destroy({
+      where: { patientId: patient.id },
+    })
+    
+    // 删除分配记录（如果有）
+    const PatientAssignment = require('../models').PatientAssignment
+    await PatientAssignment.destroy({
+      where: { patientId: patient.id },
+    })
+    
+    // 删除患者
     await patient.destroy()
+    
+    console.log(`✅ 用户 ${currentUser.username} 删除了患者 ID=${patient.id} (${patient.name})`)
+    
     res.json({
       code: 200,
       data: null,
       message: '删除成功',
     })
   } catch (err: any) {
+    console.error('Delete inpatient patient error:', err)
     return error(res, 500, err.message)
   }
 }
@@ -166,14 +265,70 @@ export const getInpatientRecords = async (req: AuthRequest, res: Response) => {
     if (caseNo) whereCondition.caseNo = { like: `%${caseNo}%` }
     if (status) whereCondition.status = status
     
-    // 数据隔离：
-    // - 学生：只能查看自己创建的病案（所有状态）
-    // - 教师：可以查看所有病案（用于教学和质控）
-    // - 管理员：可以查看所有病案
-    if (currentUser.roleType === 'student') {
-      whereCondition.doctorId = currentUser.id
+    // 数据隔离优化：
+    // - 学生：只能查看自己创建的病案 + 管理员下发患者的病案
+    // - 教师：只能查看自己创建的病案 + 管理员下发患者的病案
+    // - 管理员：只能查看自己创建的病案（不能看到其他用户的病案）
+    
+    let accessiblePatientIds: number[] = []
+    
+    if (currentUser.roleType === 'admin') {
+      // 管理员只能看到自己创建的患者对应的病案
+      const adminPatients = await InpatientPatient.findAll({
+        where: { doctorId: currentUser.id },
+        attributes: ['id'],
+      })
+      accessiblePatientIds = adminPatients.map(p => p.id)
+      
+      if (accessiblePatientIds.length > 0) {
+        whereCondition.patientId = { [Op.in]: accessiblePatientIds }
+      } else {
+        // 如果没有患者，返回空列表
+        return res.json({
+          code: 200,
+          data: {
+            list: [],
+            total: 0,
+            page: parseInt(page as string),
+            pageSize: parseInt(pageSize as string),
+          },
+          message: '获取成功',
+        })
+      }
+    } else {
+      // 学生和教师：查看自己创建的患者的病案 + 被分配患者的病案
+      const assignments = await PatientAssignment.findAll({
+        where: { userId: currentUser.id },
+        attributes: ['patientId'],
+      })
+      const assignedPatientIds = assignments.map(a => a.patientId)
+      
+      // 获取自己创建的患者ID
+      const ownPatients = await InpatientPatient.findAll({
+        where: { doctorId: currentUser.id },
+        attributes: ['id'],
+      })
+      const ownPatientIds = ownPatients.map(p => p.id)
+      
+      // 合并两个列表
+      accessiblePatientIds = [...new Set([...ownPatientIds, ...assignedPatientIds])]
+      
+      if (accessiblePatientIds.length > 0) {
+        whereCondition.patientId = { [Op.in]: accessiblePatientIds }
+      } else {
+        // 如果没有患者，返回空列表
+        return res.json({
+          code: 200,
+          data: {
+            list: [],
+            total: 0,
+            page: parseInt(page as string),
+            pageSize: parseInt(pageSize as string),
+          },
+          message: '获取成功',
+        })
+      }
     }
-    // 教师和管理员不限制 doctorId，可以查看所有病案
     
     const { count, rows } = await InpatientRecord.findAndCountAll({
       where: whereCondition,
@@ -603,6 +758,266 @@ export const getTeacherList = async (req: Request, res: Response) => {
     })
   } catch (err: any) {
     console.error('Get teacher list error:', err)
+    return error(res, 500, err.message)
+  }
+}
+
+// ==================== 辅助函数 ====================
+
+// 生成13位随机字符串（大写字母+数字）
+function generateRandomKey(): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+  let result = ''
+  for (let i = 0; i < 13; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length))
+  }
+  return result
+}
+
+// 检查KEY是否已存在
+async function isKeyExists(table: string, key: string): Promise<boolean> {
+  const sequelize = require('../config/database').default
+  const [rows] = await sequelize.query(
+    `SELECT id FROM \`${table}\` WHERE unique_key = ? LIMIT 1`,
+    { replacements: [key] }
+  )
+  return (rows as any[]).length > 0
+}
+
+// 生成唯一的KEY（最多尝试10次）
+async function generateUniqueKey(table: string, maxRetries: number = 10): Promise<string> {
+  for (let i = 0; i < maxRetries; i++) {
+    const key = generateRandomKey()
+    const exists = await isKeyExists(table, key)
+    
+    if (!exists) {
+      return key
+    }
+    
+    console.log(`⚠️  KEY ${key} 已存在，重试 (${i + 1}/${maxRetries})`)
+  }
+  
+  throw new Error(`无法生成唯一KEY，已重试${maxRetries}次`)
+}
+
+// 生成唯一住院号
+async function generateUniqueInpatientNo(): Promise<string> {
+  let inpatientNo = ''
+  let exists = true
+  
+  while (exists) {
+    const date = new Date()
+    const dateStr = date.getFullYear().toString() + 
+                   (date.getMonth() + 1).toString().padStart(2, '0') + 
+                   date.getDate().toString().padStart(2, '0')
+    const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0')
+    inpatientNo = `ZY${dateStr}${random}`
+    
+    const existing = await InpatientPatient.findOne({
+      where: { inpatientNo },
+    })
+    
+    exists = !!existing
+  }
+  
+  return inpatientNo
+}
+
+// ==================== 患者下发功能 API ====================
+
+// 管理员下发患者给所有非管理员用户（方案B：完全复制）
+export const assignPatientsToAllUsers = async (req: AuthRequest, res: Response) => {
+  try {
+    const currentUser = req.user!
+    
+    // 只有管理员可以下发患者
+    if (currentUser.roleType !== 'admin') {
+      return error(res, 403, '无权操作：只有管理员可以下发患者')
+    }
+    
+    const { patientIds, isTemplate = false } = req.body
+    
+    if (!patientIds || !Array.isArray(patientIds) || patientIds.length === 0) {
+      return error(res, 400, '请选择要下发的患者')
+    }
+    
+    // 验证患者是否存在且属于管理员
+    const patients = await InpatientPatient.findAll({
+      where: {
+        id: patientIds,
+        doctorId: currentUser.id, // 确保是管理员创建的患者
+      },
+    })
+    
+    if (patients.length !== patientIds.length) {
+      return error(res, 400, '部分患者不存在或不属于您')
+    }
+    
+    // 获取所有非管理员用户
+    const users = await User.findAll({
+      where: {
+        roleType: { [Op.ne]: 'admin' }, // 排除管理员
+      },
+      attributes: ['id'],
+    })
+    
+    if (users.length === 0) {
+      return error(res, 400, '没有可接收患者的用户')
+    }
+    
+    // 使用事务确保原子性
+    const sequelize = require('../config/database').default
+    const transaction = await sequelize.transaction()
+    
+    try {
+      let totalCopiedPatients = 0
+      let totalCopiedRecords = 0
+      
+      for (const originalPatient of patients) {
+        for (const user of users) {
+          // 检查是否已经分配过
+          const existing = await PatientAssignment.findOne({
+            where: { 
+              patientId: originalPatient.id,
+              userId: user.id 
+            },
+            transaction,
+          })
+          
+          if (existing) {
+            console.log(`⚠️  患者 ${originalPatient.id} 已分配给用户 ${user.id}，跳过`)
+            continue // 已存在则跳过
+          }
+          
+          // 生成新的唯一住院号
+          const newInpatientNo = await generateUniqueInpatientNo()
+          
+          // 生成新的唯一KEY
+          const newUniqueKey = await generateUniqueKey('inpatient_patients')
+          
+          // 复制患者数据（完全独立，不记录来源）
+          const copiedPatient = await InpatientPatient.create({
+            name: originalPatient.name,
+            gender: originalPatient.gender,
+            birthDate: originalPatient.birthDate,
+            age: originalPatient.age,
+            idCard: originalPatient.idCard,
+            phone: originalPatient.phone,
+            address: originalPatient.address,
+            inpatientNo: newInpatientNo, // 新生成的住院号
+            uniqueKey: newUniqueKey, // 新生成的唯一KEY
+            department: originalPatient.department,
+            bedNo: originalPatient.bedNo,
+            admissionDate: originalPatient.admissionDate,
+            dischargeDate: originalPatient.dischargeDate,
+            status: originalPatient.status,
+            diagnosis: originalPatient.diagnosis,
+            doctorId: user.id, // 设置为接收者
+            sourcePatientId: null, // 不记录来源，完全独立
+          }, { transaction })
+          
+          totalCopiedPatients++
+          console.log(`✅ 复制患者: ${originalPatient.id} -> ${copiedPatient.id} (住院号: ${newInpatientNo})`)
+          
+          // 复制该患者的所有病案
+          const originalRecords = await InpatientRecord.findAll({
+            where: { patientId: originalPatient.id },
+            transaction,
+          })
+          
+          for (const record of originalRecords) {
+            // 为每个病案生成新的唯一KEY
+            const recordUniqueKey = await generateUniqueKey('inpatient_records')
+            
+            await InpatientRecord.create({
+              patientId: copiedPatient.id,
+              recordType: record.recordType,
+              caseNo: newInpatientNo, // 使用新住院号
+              uniqueKey: recordUniqueKey, // 新生成的唯一KEY
+              content: record.content,
+              doctorId: user.id,
+              sourceRecordId: null, // 不记录来源，完全独立
+              status: record.status,
+              submitStatus: record.submitStatus,
+              teacherId: record.teacherId,
+              qualityComment: record.qualityComment,
+            }, { transaction })
+            
+            totalCopiedRecords++
+          }
+          
+          if (originalRecords.length > 0) {
+            console.log(`  └─ 复制了 ${originalRecords.length} 个病案`)
+          }
+          
+          // 创建分配记录
+          await PatientAssignment.create({
+            patientId: originalPatient.id, // 原始患者ID
+            userId: user.id,
+            assignedBy: currentUser.id,
+            isTemplate,
+            copiedPatientId: copiedPatient.id, // 复制后的患者ID
+            copiedAt: new Date(),
+          }, { transaction })
+        }
+      }
+      
+      await transaction.commit()
+      
+      res.json({
+        code: 200,
+        data: {
+          copiedPatients: totalCopiedPatients,
+          copiedRecords: totalCopiedRecords,
+          patientCount: patients.length,
+          userCount: users.length,
+        },
+        message: `成功将 ${patients.length} 个患者下发给 ${users.length} 个用户，创建了 ${totalCopiedPatients} 个患者副本和 ${totalCopiedRecords} 个病案副本`,
+      })
+    } catch (err: any) {
+      await transaction.rollback()
+      console.error('❌ 事务回滚:', err.message)
+      throw err
+    }
+  } catch (err: any) {
+    console.error('Assign patients error:', err)
+    return error(res, 500, err.message)
+  }
+}
+
+// 切换患者的模板状态
+export const togglePatientTemplate = async (req: AuthRequest, res: Response) => {
+  try {
+    const currentUser = req.user!
+    const { patientId } = req.params
+    const { isTemplate } = req.body
+    
+    // 只有管理员可以设置模板
+    if (currentUser.roleType !== 'admin') {
+      return error(res, 403, '无权操作：只有管理员可以设置模板')
+    }
+    
+    // 验证患者是否存在
+    const patient = await InpatientPatient.findByPk(patientId)
+    if (!patient) {
+      return error(res, 404, '患者不存在')
+    }
+    
+    // 更新所有该患者的分配记录的模板状态
+    await PatientAssignment.update(
+      { isTemplate },
+      {
+        where: { patientId },
+      }
+    )
+    
+    res.json({
+      code: 200,
+      data: { patientId, isTemplate },
+      message: isTemplate ? '已设为模板' : '已取消模板',
+    })
+  } catch (err: any) {
+    console.error('Toggle template error:', err)
     return error(res, 500, err.message)
   }
 }

@@ -5,6 +5,10 @@
         <div class="card-header">
           <span>住院患者列表</span>
           <div class="header-actions">
+            <el-button v-if="userStore.userInfo?.roleType === 'admin'" type="warning" @click="handleAssignPatients" :disabled="selectedPatients.length === 0">
+              <el-icon><Share /></el-icon>
+              下发患者 ({{ selectedPatients.length }})
+            </el-button>
             <el-button type="primary" @click="handleCreate">
               <el-icon><Plus /></el-icon>
               新增患者
@@ -45,7 +49,19 @@
       </el-form>
 
       <!-- 患者表格 -->
-      <el-table :data="patientList" v-loading="loading" stripe>
+      <el-table 
+        :data="patientList" 
+        v-loading="loading" 
+        stripe
+        @selection-change="handleSelectionChange"
+      >
+        <el-table-column v-if="userStore.userInfo?.roleType === 'admin'" type="selection" width="55" />
+        <el-table-column v-if="userStore.userInfo?.roleType !== 'admin'" prop="isTemplate" label="模板" width="80">
+          <template #default="{ row }">
+            <el-tag v-if="row.isTemplate" type="success" size="small">模板</el-tag>
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="inpatientNo" label="住院号" width="140" />
         <el-table-column prop="name" label="姓名" width="100" />
         <el-table-column prop="gender" label="性别" width="80" />
@@ -95,16 +111,19 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus } from '@element-plus/icons-vue'
+import { Plus, Share } from '@element-plus/icons-vue'
 import InpatientPatientForm from './InpatientPatientForm.vue'
-import { getInpatientPatients, deleteInpatientPatient } from '@/api/inpatient'
+import { getInpatientPatients, deleteInpatientPatient, assignPatientsToAllUsers } from '@/api/inpatient'
+import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
+const userStore = useUserStore()
 
 const loading = ref(false)
 const patientList = ref<any[]>([])
 const dialogVisible = ref(false)
 const currentPatient = ref<any>(null)
+const selectedPatients = ref<any[]>([])
 
 const searchParams = reactive({
   name: '',
@@ -130,12 +149,13 @@ const fetchPatients = async () => {
       return
     }
     
-    const response = await getInpatientPatients({
+    const response: any = await getInpatientPatients({
       page: pagination.page,
       pageSize: pagination.pageSize,
       ...searchParams,
     })
     
+    // 响应拦截器已经提取了res.data，所以直接访问response.list
     patientList.value = response.list || []
     pagination.total = response.total || 0
   } catch (error: any) {
@@ -218,6 +238,41 @@ const getStatusText = (status: string) => {
     transferred: '转科',
   }
   return texts[status] || status
+}
+
+const handleSelectionChange = (selection: any[]) => {
+  selectedPatients.value = selection
+}
+
+const handleAssignPatients = async () => {
+  if (selectedPatients.value.length === 0) {
+    ElMessage.warning('请选择要下发的患者')
+    return
+  }
+  
+  try {
+    await ElMessageBox.confirm(
+      `确定要将选中的 ${selectedPatients.value.length} 个患者下发给所有非管理员用户吗？`,
+      '提示',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning',
+      }
+    )
+    
+    const patientIds = selectedPatients.value.map(p => p.id)
+    await assignPatientsToAllUsers({ patientIds })
+    
+    ElMessage.success('下发成功')
+    selectedPatients.value = []
+    fetchPatients()
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      console.error('Failed to assign patients:', error)
+      ElMessage.error(error.message || '下发失败')
+    }
+  }
 }
 
 onMounted(() => {
