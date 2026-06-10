@@ -192,6 +192,65 @@ npm install
 
 ---
 
+## 生产环境部署
+
+### 前端环境变量配置
+
+项目已支持通过环境变量配置API地址：
+
+- `.env.development` - 开发环境配置（默认：http://localhost:3000）
+- `.env.production` - 生产环境配置（需要修改为实际服务器地址）
+
+### 部署步骤
+
+1. **修改生产环境配置**
+   ```bash
+   # 编辑 emr-frontend/.env.production
+   VITE_API_BASE_URL=http://你的服务器IP:3000
+   ```
+
+2. **构建前端**
+   ```bash
+   cd emr-frontend
+   npm run build
+   ```
+
+3. **部署后端服务**
+   ```bash
+   cd emr-backend
+   npm install
+   npm run build
+   
+   # 确保后端监听所有网络接口
+   # 修改 src/app.ts 中的 app.listen 为: app.listen(port, '0.0.0.0', ...)
+   
+   node dist/app.js &
+   ```
+
+4. **配置防火墙/安全组**
+   - 开放3000端口（后端API）
+   - 开放80/443端口（如果使用Nginx）
+
+5. **部署前端静态文件**
+   - 将 `emr-frontend/dist` 目录上传到Web服务器
+   - 或使用Nginx反向代理（推荐）
+
+### 快速检查脚本
+
+在项目根目录运行：
+```bash
+# Linux/Mac
+bash server-check.sh    # 在服务器上运行
+bash deploy.sh          # 本地构建和检查
+
+# Windows
+deploy.bat
+```
+
+详细部署说明请查看 [生产环境部署指南.md](./生产环境部署指南.md)
+
+---
+
 ## 下一步
 
 系统启动成功后,您可以:

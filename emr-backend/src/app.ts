@@ -72,10 +72,11 @@ async function start() {
     await syncDatabase()
 
     // 启动HTTP服务器
-    app.listen(config.port, () => {
-      console.log(`Server is running on port ${config.port}`)
+    const port = typeof config.port === 'string' ? parseInt(config.port) : config.port;
+    app.listen(port, '0.0.0.0', () => {
+      console.log(`Server is running on port ${port}`)
       console.log(`Environment: ${config.nodeEnv}`)
-      console.log(`API URL: http://localhost:${config.port}/api`)
+      console.log(`API URL: http://0.0.0.0:${port}/api`)
     })
   } catch (error) {
     console.error('Failed to start server:', error)
