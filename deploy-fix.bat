@@ -27,7 +27,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-scp src\database\migrations\remove-idcard-unique-constraint.ts %SERVER_USER%@%SERVER_IP%:/tmp/remove-idcard-unique-constraint.ts
+scp src\database\migrations\remove-all-patient-unique-constraints.ts %SERVER_USER%@%SERVER_IP%:/tmp/remove-all-patient-unique-constraints.ts
 if errorlevel 1 (
     echo ❌ 上传迁移文件失败
     pause
@@ -52,7 +52,7 @@ echo ssh %SERVER_USER%@%SERVER_IP%
 echo cd /opt/emr/emr-backend
 echo cp /tmp/InpatientPatient.ts src/models/InpatientPatient.ts
 echo cp /tmp/inpatientController.ts src/controllers/inpatientController.ts
-echo cp /tmp/remove-idcard-unique-constraint.ts src/database/migrations/remove-idcard-unique-constraint.ts
+echo cp /tmp/remove-all-patient-unique-constraints.ts src/database/migrations/remove-all-patient-unique-constraints.ts
 echo chmod +x /tmp/fix-patient-assign.sh
 echo bash /tmp/fix-patient-assign.sh
 echo.

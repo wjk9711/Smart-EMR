@@ -886,41 +886,36 @@ export const assignPatientsToAllUsers = async (req: AuthRequest, res: Response) 
           // 注意：不再检查是否已分配过，允许重复下发
           // 每次下发都创建新的副本患者和病案
           
-          // 生成新的唯一住院号
-          console.log(`    - 生成新住院号...`)
-          const newInpatientNo = await generateUniqueInpatientNo()
-          console.log(`    - 新住院号: ${newInpatientNo}`)
-          
-          // 生成新的唯一KEY
+          // 生成新的唯一KEY（唯一需要重新生成的字段）
           console.log(`    - 生成患者唯一KEY...`)
           const newUniqueKey = await generateUniqueKey('inpatient_patients')
           console.log(`    - 患者KEY: ${newUniqueKey}`)
           
           // 复制患者数据（完全独立，不记录来源）
-          // 注意：由于已移除 id_card 的唯一约束，不同用户可以有相同身份证号的患者副本
+          // 注意：除了 unique_key 外，所有其他字段都保持原样
           console.log(`    - 创建副本患者...`)
           const copiedPatient = await InpatientPatient.create({
             name: originalPatient.name,
             gender: originalPatient.gender,
             birthDate: originalPatient.birthDate,
             age: originalPatient.age,
-            idCard: originalPatient.idCard, // 直接使用原始身份证号
-            phone: originalPatient.phone,
-            address: originalPatient.address,
-            inpatientNo: newInpatientNo, // 新生成的住院号
-            uniqueKey: newUniqueKey, // 新生成的唯一KEY
+            idCard: originalPatient.idCard,      // ✅ 保持原样
+            phone: originalPatient.phone,         // ✅ 保持原样
+            address: originalPatient.address,     // ✅ 保持原样
+            inpatientNo: originalPatient.inpatientNo, // ✅ 保持原样（住院号可以重复）
+            uniqueKey: newUniqueKey,              // ✅ 唯一需要重新生成的字段
             department: originalPatient.department,
             bedNo: originalPatient.bedNo,
             admissionDate: originalPatient.admissionDate,
             dischargeDate: originalPatient.dischargeDate,
             status: originalPatient.status,
             diagnosis: originalPatient.diagnosis,
-            doctorId: user.id, // 设置为接收者
-            sourcePatientId: null, // 不记录来源，完全独立
+            doctorId: user.id,                    // ✅ 设置为接收者
+            sourcePatientId: null,                // ✅ 不记录来源，完全独立
           }, { transaction })
           
           totalCopiedPatients++
-          console.log(`✅ 复制患者: ${originalPatient.id} -> ${copiedPatient.id} (住院号: ${newInpatientNo})`)
+          console.log(`✅ 复制患者: ${originalPatient.id} -> ${copiedPatient.id} (住院号: ${originalPatient.inpatientNo})`)
           
           // 复制该患者的所有病案
           const originalRecords = await InpatientRecord.findAll({
@@ -935,8 +930,8 @@ export const assignPatientsToAllUsers = async (req: AuthRequest, res: Response) 
             await InpatientRecord.create({
               patientId: copiedPatient.id,
               recordType: record.recordType,
-              caseNo: newInpatientNo, // 使用新住院号
-              uniqueKey: recordUniqueKey, // 新生成的唯一KEY
+              caseNo: originalPatient.inpatientNo, // ✅ 使用原始住院号（保持原样）
+              uniqueKey: recordUniqueKey, // ✅ 新生成的唯一KEY
               content: record.content,
               doctorId: user.id,
               sourceRecordId: null, // 不记录来源，完全独立

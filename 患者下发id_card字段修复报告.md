@@ -1,8 +1,8 @@
-# 患者下发功能 id_card 字段问题修复报告
+# 患者下发功能唯一约束修复报告
 
 ## 问题描述
 
-在云服务器上点击"下发患者"时，PM2 后端日志报错：
+在云服务器上点击“下发患者”时，PM2 后端日志报错：
 
 ### 第一次错误（唯一约束冲突）
 ```
@@ -19,68 +19,102 @@ SequelizeDatabaseError: Data too long for column 'id_card' at row 1
 
 **原因**：代码尝试生成新的身份证号（原始18位 + 下划线 + 时间戳 + 随机数 = 28位），超过了数据库字段定义的 VARCHAR(18) 长度限制。
 
+## 需求分析
+
+根据业务需求，下发患者时：
+1. **只重新生成两个字段**：
+   - `unique_key`：13位随机字符串，作为患者的唯一标识
+   - `inpatient_no`：住院号，每个副本都需要唯一的住院号
+
+2. **其他所有字段保持原样**：
+   - 姓名、性别、年龄、身份证号、电话、地址等所有患者基本信息
+   - 科室、床号、入院日期、出院日期、状态、诊断等医疗信息
+   - 这些字段都不需要唯一性约束，允许多个用户拥有相同信息的患者副本
+
 ## 解决方案
 
-### 1. 移除 id_card 字段的唯一约束
+### 1. 移除所有不必要的唯一约束
 
 **修改文件**：`emr-backend/src/models/InpatientPatient.ts`
 
 ```typescript
-// 修改前
-idCard: {
-  type: DataTypes.STRING(18),
-  allowNull: false,
-  unique: true,  // ❌ 移除这行
-  comment: '身份证号',
+// 只有 unique_key 保留唯一约束
+uniqueKey: {
+  type: DataTypes.STRING(13),
+  allowNull: true,
+  unique: true,  // ✅ 保留：每个患者副本必须有唯一的KEY
+  comment: '患者唯一标识（13位随机字符串）',
 },
 
-// 修改后
+// 其他所有字段都不设置 unique: true
 idCard: {
   type: DataTypes.STRING(18),
   allowNull: false,
-  // unique: true, // ✅ 注释掉，允许不同用户拥有相同身份证号的患者副本
+  // unique: true, // ❌ 已移除
   comment: '身份证号',
 },
+phone: {
+  type: DataTypes.STRING(20),
+  allowNull: false,
+  // unique: true, // ❌ 不设置
+  comment: '联系电话',
+},
+inpatientNo: {
+  type: DataTypes.STRING(50),
+  allowNull: false,
+  // unique: true, // ❌ 已移除
+  comment: '住院号',
+},
+// ... 其他字段都不设置 unique
 ```
 
 ### 2. 创建数据库迁移脚本
 
-**新建文件**：`emr-backend/src/database/migrations/remove-idcard-unique-constraint.ts`
+**新建文件**：`emr-backend/src/database/migrations/remove-all-patient-unique-constraints.ts`
 
 该脚本会：
-- 检查 `inpatient_patients` 表中 `id_card` 字段是否存在唯一索引
-- 如果存在，则移除该唯一索引
-- 提供回滚功能以恢复唯一约束
+- 检查 `inpatient_patients` 表中所有唯一索引
+- 自动移除除了 `id` (主键) 和 `unique_key` 之外的所有唯一索引
+- 确保下发患者时不会因为任何字段的唯一约束而失败
 
-### 3. 移除生成新身份证号的逻辑
+### 3. 确保下发逻辑正确
 
 **修改文件**：`emr-backend/src/controllers/inpatientController.ts`
 
+下发患者时只重新生成两个字段，其他所有信息都保持原样：
+
 ```typescript
-// 修改前（第899-915行）
-// 生成唯一的身份证号（在原始身份证号后添加时间戳和随机数）
-const timestamp = Date.now().toString().slice(-6)
-const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0')
-const newIdCard = originalPatient.idCard 
-  ? `${originalPatient.idCard}_${timestamp}${random}`
-  : null
+// 生成新的唯一住院号
+const newInpatientNo = await generateUniqueInpatientNo()
 
-console.log(`    - 新身份证号: ${newIdCard || '(空)'}`)
+// 生成新的唯一KEY
+const newUniqueKey = await generateUniqueKey('inpatient_patients')
 
-const copiedPatient = await InpatientPatient.create({
-  // ...
-  idCard: newIdCard, // ❌ 使用超长的新身份证号
-  // ...
-})
-
-// 修改后
 // 复制患者数据（完全独立，不记录来源）
-// 注意：由于已移除 id_card 的唯一约束，不同用户可以有相同身份证号的患者副本
 const copiedPatient = await InpatientPatient.create({
-  // ...
-  idCard: originalPatient.idCard, // ✅ 直接使用原始身份证号
-  // ...
-})
+  // ✅ 以下字段保持原样
+  name: originalPatient.name,
+  gender: originalPatient.gender,
+  birthDate: originalPatient.birthDate,
+  age: originalPatient.age,
+  idCard: originalPatient.idCard,  // 直接使用原始身份证号
+  phone: originalPatient.phone,
+  address: originalPatient.address,
+  department: originalPatient.department,
+  bedNo: originalPatient.bedNo,
+  admissionDate: originalPatient.admissionDate,
+  dischargeDate: originalPatient.dischargeDate,
+  status: originalPatient.status,
+  diagnosis: originalPatient.diagnosis,
+  
+  // ✅ 以下字段重新生成
+  inpatientNo: newInpatientNo,      // 新生成的住院号
+  uniqueKey: newUniqueKey,          // 新生成的唯一KEY
+  
+  // ✅ 以下字段根据接收者设置
+  doctorId: user.id,                // 设置为接收者
+  sourcePatientId: null,            // 不记录来源，完全独立
+}, { transaction })
 ```
 
 ## 部署步骤
@@ -173,7 +207,7 @@ const copiedPatient = await InpatientPatient.create({
 
 - `emr-backend/src/models/InpatientPatient.ts` - 患者模型定义
 - `emr-backend/src/controllers/inpatientController.ts` - 患者控制器（包含下发逻辑）
-- `emr-backend/src/database/migrations/remove-idcard-unique-constraint.ts` - 数据库迁移脚本
+- `emr-backend/src/database/migrations/remove-all-patient-unique-constraints.ts` - 数据库迁移脚本
 - `fix-patient-assign.sh` - 服务器端修复脚本
 - `deploy-fix.bat` - Windows 部署脚本
 
@@ -186,10 +220,12 @@ const copiedPatient = await InpatientPatient.create({
 
 ## 修复完成标记
 
-- [x] 移除 InpatientPatient 模型中 id_card 的唯一约束
-- [x] 创建数据库迁移脚本
-- [x] 移除生成新身份证号的逻辑
+- [x] 检查 InpatientPatient 模型中所有字段的唯一约束
+- [x] 确认只有 unique_key 字段保留唯一约束
+- [x] 创建数据库迁移脚本，自动移除所有不必要的唯一索引
+- [x] 验证下发患者逻辑只重新生成 unique_key 和 inpatient_no
+- [x] 确保其他所有患者信息都保持原样
 - [x] 创建自动化部署脚本
-- [x] 编写修复文档
+- [x] 编写完整修复文档
 - [ ] 在云服务器上执行修复（待用户操作）
 - [ ] 验证下发患者功能正常（待用户测试）
