@@ -1,85 +1,82 @@
 import sequelize from './src/config/database'
+import { InpatientPatient, InpatientRecord, PatientAssignment } from './src/models'
 
-async function cleanInvalidAssignments() {
+async function cleanInvalidData() {
+  console.log('开始清理无效数据...\n')
+  
   try {
-    console.log('=== 清理无效的 PatientAssignment 记录 ===\n')
+    const transaction = await sequelize.transaction()
     
-    // 查找所有copied_patient_id为null的分配记录
-    const [assignments] = await sequelize.query(`
-      SELECT pa.id, pa.patientId, pa.userId,
-             (SELECT username FROM users WHERE id = pa.userId) as user_name,
-             (SELECT name FROM inpatient_patients WHERE id = pa.patientId) as patient_name
-      FROM patient_assignments pa
-      WHERE pa.copied_patient_id IS NULL
-    `)
-    
-    console.log(`发现 ${ (assignments as any[]).length } 条无效记录\n`)
-    
-    if ((assignments as any[]).length === 0) {
-      console.log('✅ 没有需要清理的记录')
-      process.exit(0)
-      return
+    try {
+      // 1. 删除copiedPatientId为NULL的分配记录
+      console.log('1️⃣ 删除copiedPatientId为NULL的分配记录...')
+      const deletedAssignments = await PatientAssignment.destroy({
+        where: {
+          patientId: 18,
+          copiedPatientId: null,
+        },
+        transaction,
+      })
+      console.log(`   ✅ 删除了 ${deletedAssignments} 条无效分配记录\n`)
+      
+      // 2. 查找所有患者ID=18的副本患者
+      console.log('2️⃣ 查找所有副本患者...')
+      const assignments = await PatientAssignment.findAll({
+        where: { patientId: 18 },
+        attributes: ['id', 'userId', 'copiedPatientId'],
+        transaction,
+      })
+      
+      console.log(`   找到 ${assignments.length} 个有效的分配记录\n`)
+      
+      // 3. 检查每个副本患者的病案数量
+      console.log('3️⃣ 检查副本患者的病案数量...')
+      let cleanedCount = 0
+      
+      for (const assignment of assignments) {
+        if (!assignment.copiedPatientId) continue
+        
+        const copyPatient = await InpatientPatient.findByPk(assignment.copiedPatientId, { transaction })
+        if (!copyPatient) continue
+        
+        const recordCount = await InpatientRecord.count({
+          where: { patientId: assignment.copiedPatientId },
+          transaction,
+        })
+        
+        console.log(`   用户${assignment.userId}: 副本患者ID=${assignment.copiedPatientId}, 病案数=${recordCount}`)
+        
+        // 如果病案数量为0，删除这个副本和分配记录
+        if (recordCount === 0) {
+          console.log(`     ⚠️  病案数量为0，删除此副本...`)
+          
+          // 删除分配记录
+          await assignment.destroy({ transaction })
+          
+          // 删除副本患者
+          await copyPatient.destroy({ transaction })
+          
+          cleanedCount++
+          console.log(`     ✅ 已删除`)
+        }
+      }
+      
+      console.log(`\n   ✅ 共清理了 ${cleanedCount} 个无效副本\n`)
+      
+      await transaction.commit()
+      console.log('✅ 清理完成！')
+      
+    } catch (err) {
+      await transaction.rollback()
+      console.error('❌ 清理失败:', err)
+      throw err
     }
     
-    console.log('无效记录列表:')
-    console.table(assignments)
-    
-    // 询问是否删除
-    console.log('\n⚠️  这些记录表示下发失败，建议删除。\n')
-    console.log('按回车键继续删除，或按 Ctrl+C 取消...')
-    
-    // 自动确认（生产环境应该交互式确认）
-    const readline = require('readline')
-    const rl = readline.createInterface({
-      input: process.stdin,
-      output: process.stdout
-    })
-    
-    rl.question('确认删除？(y/n): ', async (answer: string) => {
-      rl.close()
-      
-      if (answer.toLowerCase() !== 'y') {
-        console.log('❌ 已取消')
-        process.exit(0)
-        return
-      }
-      
-      let deletedCount = 0
-      
-      for (const assignment of assignments as any[]) {
-        await sequelize.query(`
-          DELETE FROM patient_assignments WHERE id = ?
-        `, { replacements: [assignment.id] })
-        
-        console.log(`✅ 删除记录 ID=${assignment.id} (用户: ${assignment.user_name}, 患者: ${assignment.patient_name})`)
-        deletedCount++
-      }
-      
-      console.log(`\n=== 清理完成 ===`)
-      console.log(`✅ 已删除 ${deletedCount} 条无效记录`)
-      
-      // 验证
-      const [remaining] = await sequelize.query(`
-        SELECT COUNT(*) as count 
-        FROM patient_assignments 
-        WHERE copied_patient_id IS NULL
-      `)
-      
-      const remainingCount = (remaining as any[])[0].count
-      if (remainingCount === 0) {
-        console.log('✅ 所有无效记录已清理')
-      } else {
-        console.log(`⚠️  仍有 ${remainingCount} 条无效记录`)
-      }
-      
-      process.exit(0)
-    })
-    
-  } catch (error: any) {
-    console.error('❌ Error:', error.message)
-    console.error(error)
+    process.exit(0)
+  } catch (error) {
+    console.error('❌ 执行失败:', error)
     process.exit(1)
   }
 }
 
-cleanInvalidAssignments()
+cleanInvalidData()

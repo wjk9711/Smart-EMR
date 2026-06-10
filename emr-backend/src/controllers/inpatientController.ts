@@ -42,6 +42,7 @@ export const getInpatientPatients = async (req: AuthRequest, res: Response) => {
     // - 管理员：只能查看自己创建的患者（不能看到其他用户的病人）
     
     let patientIds: number[] = []
+    let copiedPatientIds: number[] = [] // ✅ 提升到外部作用域
     
     if (currentUser.roleType === 'admin') {
       // 管理员只能看到自己创建的患者
@@ -54,9 +55,9 @@ export const getInpatientPatients = async (req: AuthRequest, res: Response) => {
       })
       
       // 过滤掉null值（可能有些分配记录没有copiedPatientId）
-      const copiedPatientIds = assignments
+      copiedPatientIds = assignments
         .map(a => a.copiedPatientId)
-        .filter(id => id !== null) as number[]
+        .filter((id): id is number => id !== null && id !== undefined)
       
       if (copiedPatientIds.length > 0) {
         // 使用 OR 条件：doctorId = currentUser.id OR id IN (copiedPatientIds)
@@ -84,18 +85,19 @@ export const getInpatientPatients = async (req: AuthRequest, res: Response) => {
     
     // 为每个患者添加isTemplate标记（仅对非管理员用户）
     let patientsWithTemplate = rows
-    if (currentUser.roleType !== 'admin' && patientIds.length > 0) {
+    if (currentUser.roleType !== 'admin') {
+      // ✅ 使用copiedPatientIds来查询模板状态
       const templateAssignments = await PatientAssignment.findAll({
         where: {
           userId: currentUser.id,
-          patientId: patientIds,
+          copiedPatientId: { [Op.in]: copiedPatientIds }, // ✅ 使用副本患者ID
         },
-        attributes: ['patientId', 'isTemplate'],
+        attributes: ['copiedPatientId', 'isTemplate'],
       })
       
       const templateMap = new Map<number, boolean>()
       templateAssignments.forEach(assignment => {
-        templateMap.set(assignment.patientId, assignment.isTemplate)
+        templateMap.set(assignment.copiedPatientId!, assignment.isTemplate) // ✅ 使用copiedPatientId
       })
       
       patientsWithTemplate = rows.map(patient => {
@@ -232,10 +234,10 @@ export const deleteInpatientPatient = async (req: AuthRequest, res: Response) =>
       where: { patientId: patient.id },
     })
     
-    // 删除分配记录（如果有）
+    // 删除分配记录（如果有）- ✅ 使用copiedPatientId
     const PatientAssignment = require('../models').PatientAssignment
     await PatientAssignment.destroy({
-      where: { patientId: patient.id },
+      where: { copiedPatientId: patient.id }, // ✅ 使用副本患者ID
     })
     
     // 删除患者
@@ -299,9 +301,9 @@ export const getInpatientRecords = async (req: AuthRequest, res: Response) => {
       // 学生和教师：查看自己创建的患者的病案 + 被分配患者的病案
       const assignments = await PatientAssignment.findAll({
         where: { userId: currentUser.id },
-        attributes: ['patientId'],
+        attributes: ['copiedPatientId'], // ✅ 使用副本患者ID
       })
-      const assignedPatientIds = assignments.map(a => a.patientId)
+      const assignedPatientIds = assignments.map(a => a.copiedPatientId).filter((id): id is number => id !== null && id !== undefined) // ✅ 过滤掉null值
       
       // 获取自己创建的患者ID
       const ownPatients = await InpatientPatient.findAll({

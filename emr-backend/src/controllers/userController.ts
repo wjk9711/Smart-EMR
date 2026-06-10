@@ -171,11 +171,21 @@ export const deleteUser = async (req: Request, res: Response) => {
     }
     
     // 不能删除自己
-    if (Number(id) === currentUser.id) {
+    const userId = Number(id)
+    
+    // 验证ID是否有效
+    if (isNaN(userId) || userId <= 0) {
+      console.log('❌ 无效的用户ID:', id)
+      return error(res, 400, '无效的用户ID')
+    }
+    
+    if (userId === currentUser.id) {
       return error(res, 400, '不能删除当前登录的账户')
     }
     
-    const user = await User.findByPk(Number(id))
+    console.log('删除用户 ID:', userId)
+    
+    const user = await User.findByPk(userId)
     
     if (!user) {
       return error(res, 404, '用户不存在')
@@ -196,33 +206,174 @@ export const batchDeleteUsers = async (req: Request, res: Response) => {
     const currentUser = (req as any).user
     const { ids } = req.body
     
+    console.log('=== 批量删除用户 ===')
+    console.log('当前用户:', currentUser?.id, currentUser?.username)
+    console.log('要删除的IDs:', ids)
+    
     // 检查是否为管理员
     if (currentUser.roleType !== 'admin') {
+      console.log('❌ 非管理员尝试删除用户')
       return error(res, 403, '无权操作：仅管理员可批量删除用户')
     }
     
     if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      console.log('❌ 未提供有效的用户ID列表')
       return error(res, 400, '请提供要删除的用户ID列表')
     }
     
     // 不能删除自己
     const currentUserId = Number(currentUser.id)
-    const userIds = ids.map(id => Number(id))
+    
+    // 验证并转换IDs，过滤掉无效值
+    const userIds = ids
+      .map(id => Number(id))
+      .filter(id => !isNaN(id) && id > 0)
+    
+    console.log('当前用户ID:', currentUserId)
+    console.log('原始IDs:', ids)
+    console.log('有效用户IDs:', userIds)
+    
+    if (userIds.length === 0) {
+      console.log('❌ 没有有效的用户ID')
+      return error(res, 400, '请提供有效的用户ID列表')
+    }
     
     if (userIds.includes(currentUserId)) {
+      console.log('❌ 尝试删除自己')
       return error(res, 400, '不能删除当前登录的账户')
     }
     
-    const deletedCount = await User.destroy({
+    // 先检查用户是否存在
+    const existingUsers = await User.findAll({
       where: {
         id: { [Op.in]: userIds },
       },
+      attributes: ['id', 'username', 'realName'],
     })
     
-    return success(res, { deletedCount }, `成功删除${deletedCount}个用户`)
+    console.log('找到的用户:', existingUsers.map(u => ({ id: u.id, username: u.username })))
+    console.log('找到的用户详情:', JSON.stringify(existingUsers.map(u => ({ id: u.id, typeof_id: typeof u.id, username: u.username })), null, 2))
+    
+    if (existingUsers.length === 0) {
+      console.log('❌ 没有找到任何要删除的用户')
+      return error(res, 404, '没有找到要删除的用户')
+    }
+    
+    console.log(`准备删除 ${existingUsers.length} 个用户...`)
+    
+    // 使用事务确保原子性
+    const sequelize = require('../config/database').default
+    const transaction = await sequelize.transaction()
+    
+    try {
+      // 检查每个用户是否有关联数据，并级联删除
+      const { InpatientPatient, InpatientRecord, PatientAssignment } = require('../models')
+      
+      console.log('模型加载检查:')
+      console.log('  - InpatientPatient:', !!InpatientPatient)
+      console.log('  - InpatientRecord:', !!InpatientRecord)
+      console.log('  - PatientAssignment:', !!PatientAssignment)
+      
+      let totalDeletedPatients = 0
+      let totalDeletedRecords = 0
+      let totalDeletedAssignments = 0
+      
+      for (const user of existingUsers) {
+        console.log(`\n处理用户 ${user.id} (${user.username})...`)
+        
+        // 1. 删除患者分配记录
+        const deletedAssignments = await PatientAssignment.destroy({
+          where: { userId: user.id },
+          transaction,
+        })
+        if (deletedAssignments > 0) {
+          console.log(`  ✅ 删除 ${deletedAssignments} 条患者分配记录`)
+          totalDeletedAssignments += deletedAssignments
+        }
+        
+        // 2. 获取该用户创建的所有患者ID
+        const patients = await InpatientPatient.findAll({
+          where: { doctorId: user.id },
+          attributes: ['id'],
+          transaction,
+        })
+        const patientIds = patients.map((p: any) => p.id)
+        
+        // 3. 删除这些患者的所有病案
+        if (patientIds.length > 0) {
+          const deletedRecords = await InpatientRecord.destroy({
+            where: { patientId: { [Op.in]: patientIds } },
+            transaction,
+          })
+          if (deletedRecords > 0) {
+            console.log(`  ✅ 删除 ${deletedRecords} 条病案记录`)
+            totalDeletedRecords += deletedRecords
+          }
+        }
+        
+        // 4. 删除该用户创建的所有患者
+        const deletedPatients = await InpatientPatient.destroy({
+          where: { doctorId: user.id },
+          transaction,
+        })
+        if (deletedPatients > 0) {
+          console.log(`  ✅ 删除 ${deletedPatients} 个患者`)
+          totalDeletedPatients += deletedPatients
+        }
+        
+        console.log(`  📊 用户 ${user.username} 清理完成: 分配=${deletedAssignments}, 病案=${patientIds.length > 0 ? '已清理' : '无'}, 患者=${deletedPatients}`)
+      }
+      
+      console.log('\n📊 关联数据清理统计:')
+      console.log(`  - 患者分配: ${totalDeletedAssignments} 条`)
+      console.log(`  - 病案记录: ${totalDeletedRecords} 条`)
+      console.log(`  - 患者数据: ${totalDeletedPatients} 个`)
+      
+      // 5. 删除用户
+      console.log('\n开始删除用户...')
+      const deletedCount = await User.destroy({
+        where: {
+          id: { [Op.in]: userIds },
+        },
+        transaction,
+      })
+      
+      // 提交事务
+      await transaction.commit()
+      
+      console.log(`✅ 成功删除 ${deletedCount} 个用户及其关联数据`)
+      
+      return success(res, {
+        deletedUsers: deletedCount,
+        deletedPatients: totalDeletedPatients,
+        deletedRecords: totalDeletedRecords,
+        deletedAssignments: totalDeletedAssignments,
+      }, `成功删除${deletedCount}个用户及${totalDeletedPatients}个患者、${totalDeletedRecords}条病案、${totalDeletedAssignments}条分配记录`)
+    } catch (err: any) {
+      // 回滚事务
+      await transaction.rollback()
+      
+      console.error('❌ 批量删除失败，事务已回滚:', err)
+      console.error('❌ Error name:', err.name)
+      console.error('❌ Error message:', err.message)
+      console.error('❌ Error stack:', err.stack)
+      
+      return error(res, 500, err.message || '批量删除失败')
+    }
   } catch (err: any) {
-    console.error('Batch delete users error:', err)
-    return error(res, 500, err.message)
+    console.error('❌ Batch delete users error:', err)
+    console.error('❌ Error name:', err.name)
+    console.error('❌ Error message:', err.message)
+    console.error('❌ Error stack:', err.stack)
+    console.error('❌ Error original:', err.original)
+    console.error('❌ Error sql:', err.sql)
+    
+    // 如果是外键约束错误，返回友好提示
+    if (err.name === 'SequelizeForeignKeyConstraintError') {
+      return error(res, 400, '删除失败：该用户有关联的数据（如患者、病案等），请先删除相关数据')
+    }
+    
+    return error(res, 500, err.message || '删除失败')
   }
 }
 

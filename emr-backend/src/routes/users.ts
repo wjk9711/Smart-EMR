@@ -23,13 +23,13 @@ router.post('/', createUser)
 // 批量创建用户
 router.post('/batch-create', batchCreateUsers)
 
+// 批量删除用户（必须在 /:id 之前）
+router.delete('/batch-delete', batchDeleteUsers)
+
 // 更新用户
 router.put('/:id', updateUser)
 
 // 删除单个用户
 router.delete('/:id', deleteUser)
-
-// 批量删除用户
-router.delete('/batch-delete', batchDeleteUsers)
 
 export default router
