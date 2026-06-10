@@ -883,8 +883,20 @@ export const assignPatientsToAllUsers = async (req: AuthRequest, res: Response) 
         
         for (const user of users) {
           console.log(`  → 下发给用户: ${user.id}`)
-          // 注意：不再检查是否已分配过，允许重复下发
-          // 每次下发都创建新的副本患者和病案
+          
+          // 检查是否已经下发过（避免重复创建）
+          const existingAssignment = await PatientAssignment.findOne({
+            where: {
+              patientId: originalPatient.id,
+              userId: user.id,
+            },
+            transaction,
+          })
+          
+          if (existingAssignment) {
+            console.log(`    ⚠️  该用户已收到此患者，跳过（分配ID: ${existingAssignment.id}）`)
+            continue
+          }
           
           // 生成新的唯一KEY（唯一需要重新生成的字段）
           console.log(`    - 生成患者唯一KEY...`)
