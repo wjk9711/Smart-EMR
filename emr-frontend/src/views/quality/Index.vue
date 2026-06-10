@@ -4,7 +4,13 @@
       <template #header>
         <div class="card-header">
           <span>病历质控</span>
-          <el-button type="primary" @click="handleViewAllRecords">查看全部病历</el-button>
+          <div class="header-actions">
+            <template v-if="isTeacherOrAdmin">
+              <el-button type="primary" @click="handleNavigateToControlEvaluation">质控评价</el-button>
+              <el-button type="success" @click="handleNavigateToGroupControl">小组质控</el-button>
+            </template>
+            <el-button @click="handleViewAllRecords">查看全部病历</el-button>
+          </div>
         </div>
       </template>
 
@@ -201,6 +207,20 @@ const recordList = ref<any[]>([])
 const qualityDialogVisible = ref(false)
 const currentRecord = ref<any>(null)
 
+// 判断是否为教师或管理员
+const isTeacherOrAdmin = computed(() => {
+  const userInfoStr = localStorage.getItem('userInfo')
+  if (userInfoStr) {
+    try {
+      const userInfo = JSON.parse(userInfoStr)
+      return userInfo.roleType === 'teacher' || userInfo.roleType === 'admin'
+    } catch (e) {
+      return false
+    }
+  }
+  return false
+})
+
 const searchParams = reactive({
   keyword: '',
   status: '',
@@ -277,6 +297,14 @@ const handleReset = () => {
 
 const handleViewAllRecords = () => {
   router.push('/outpatient/records')
+}
+
+const handleNavigateToControlEvaluation = () => {
+  router.push('/quality/control-evaluation')
+}
+
+const handleNavigateToGroupControl = () => {
+  router.push('/quality/group-control')
 }
 
 const handleView = (row: any) => {
@@ -629,6 +657,11 @@ onMounted(() => {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    
+    .header-actions {
+      display: flex;
+      gap: 10px;
+    }
   }
 
   .search-form {

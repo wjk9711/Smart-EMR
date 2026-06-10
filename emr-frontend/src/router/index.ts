@@ -86,6 +86,18 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '病历质控', module: 'quality' },
       },
       {
+        path: '/quality/control-evaluation',
+        name: 'QualityControlEvaluation',
+        component: () => import('@/views/quality/QualityControlEvaluation.vue'),
+        meta: { title: '质控评价', module: 'quality', requiresAuth: true, roles: ['teacher', 'admin'] },
+      },
+      {
+        path: '/quality/group-control',
+        name: 'GroupQualityControl',
+        component: () => import('@/views/quality/GroupQualityControl.vue'),
+        meta: { title: '小组质控', module: 'quality', requiresAuth: true, roles: ['teacher', 'admin'] },
+      },
+      {
         path: '/quality/review',
         name: 'TeacherReview',
         component: () => import('@/views/quality/TeacherReview.vue'),
@@ -160,13 +172,14 @@ router.beforeEach((to, _from, next) => {
     }
     
     // 检查教师审核页面的权限（仅教师和管理员可访问）
-    if (to.path === '/quality/review' || to.path === '/quality/outpatient-review') {
+    if (to.path === '/quality/review' || to.path === '/quality/outpatient-review' || 
+        to.path === '/quality/control-evaluation' || to.path === '/quality/group-control') {
       const userInfoStr = localStorage.getItem('userInfo')
       if (userInfoStr) {
         try {
           const userInfo = JSON.parse(userInfoStr)
           if (userInfo.roleType !== 'teacher' && userInfo.roleType !== 'admin') {
-            ElMessage.warning('无权访问：只有教师可以审核病历')
+            ElMessage.warning('无权访问：只有教师可以访问质控功能')
             next('/')
             return
           }
