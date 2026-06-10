@@ -48,6 +48,9 @@
           >
             门诊病历审核
           </el-menu-item>
+          <el-menu-item index="/quality/reports">
+            质控报告
+          </el-menu-item>
         </el-sub-menu>
 
         <el-sub-menu index="nursing">

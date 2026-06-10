@@ -98,6 +98,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '小组质控', module: 'quality', requiresAuth: true, roles: ['teacher', 'admin'] },
       },
       {
+        path: '/quality/reports',
+        name: 'QualityReportList',
+        component: () => import('@/views/quality/QualityReportList.vue'),
+        meta: { title: '质控报告', module: 'quality' },
+      },
+      {
         path: '/quality/review',
         name: 'TeacherReview',
         component: () => import('@/views/quality/TeacherReview.vue'),

@@ -13,6 +13,7 @@ import outpatientRoutes from './routes/outpatient'
 import templateRoutes from './routes/templates'
 import inpatientRoutes from './routes/inpatient'
 import qualityRoutes from './routes/quality'
+import qualityReportRoutes from './routes/qualityReports'
 import nursingRoutes from './routes/nursing'
 import systemRoutes from './routes/system'
 import userRoutes from './routes/users'
@@ -36,6 +37,7 @@ app.use('/api/outpatient', outpatientRoutes)
 app.use('/api/templates', templateRoutes)
 app.use('/api/inpatient', inpatientRoutes)
 app.use('/api/quality', qualityRoutes)
+app.use('/api/quality-reports', qualityReportRoutes)
 app.use('/api/nursing', nursingRoutes)
 app.use('/api/system', systemRoutes)
 app.use('/api/users', userRoutes)

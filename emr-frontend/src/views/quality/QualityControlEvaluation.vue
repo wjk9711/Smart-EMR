@@ -137,7 +137,7 @@ const overviewStats = reactive({
   completedCount: 43,
   totalCount: 43,
   avgTime: '4m21s',
-  avgAccuracy: 91.2,
+  avgAccuracy: 87.1, // ✅ 修改为87.1%
   aiScore: 93,
 })
 
@@ -146,6 +146,7 @@ const chartRef = ref<HTMLDivElement>()
 let chartInstance: echarts.ECharts | null = null
 
 // 诊断数据（根据要求生成）
+// 目标：平均正确率87.1%，单胎活产40.8%
 const diagnosisData = [
   { name: '瘢痕子宫N85.805', accuracy: 95.2 },
   { name: '梗阻性分娩O66.901', accuracy: 88.5 },
@@ -158,15 +159,33 @@ const diagnosisData = [
   { name: '轻度贫血D64.906', accuracy: 94.8 },
   { name: '低钾血症E87.601', accuracy: 89.2 },
   { name: '真菌性阴道炎B37.304', accuracy: 90.4 },
+  { name: '单胎活产Z37.000X001', accuracy: 40.8 }, // ✅ 新增，正确率40.8%
 ]
 
-// 调整准确率以确保平均值为91.2%
+// 调整准确率以确保平均值为87.1%
 const adjustAccuracies = () => {
-  const currentAvg = diagnosisData.reduce((sum, d) => sum + d.accuracy, 0) / diagnosisData.length
-  const diff = 91.2 - currentAvg
+  const targetAvg = 87.1 // 目标平均值
   
-  // 微调每个值
-  diagnosisData.forEach(d => {
+  // 计算除单胎活产外其他诊断的总和
+  const otherDiagnoses = diagnosisData.filter(d => d.name !== '单胎活产Z37.000X001')
+  const singleBirthIndex = diagnosisData.findIndex(d => d.name === '单胎活产Z37.000X001')
+  
+  // 单胎活产固定为40.8%
+  const singleBirthAccuracy = 40.8
+  
+  // 计算其他诊断需要的总和
+  // 公式：(其他诊断总和 + 40.8) / 总数 = 87.1
+  // 其他诊断总和 = 87.1 * 总数 - 40.8
+  const requiredSum = targetAvg * diagnosisData.length - singleBirthAccuracy
+  
+  // 计算当前其他诊断的总和
+  const currentSum = otherDiagnoses.reduce((sum, d) => sum + d.accuracy, 0)
+  
+  // 计算需要调整的差值
+  const diff = (requiredSum - currentSum) / otherDiagnoses.length
+  
+  // 微调每个其他诊断的值
+  otherDiagnoses.forEach(d => {
     d.accuracy = Math.min(100, Math.max(0, d.accuracy + diff))
   })
   
@@ -174,6 +193,10 @@ const adjustAccuracies = () => {
   diagnosisData.forEach(d => {
     d.accuracy = Math.round(d.accuracy * 10) / 10
   })
+  
+  // 验证平均值
+  const actualAvg = diagnosisData.reduce((sum, d) => sum + d.accuracy, 0) / diagnosisData.length
+  console.log(`调整后平均值: ${actualAvg.toFixed(2)}% (目标: ${targetAvg}%)`)
 }
 
 // 初始化图表
@@ -216,7 +239,7 @@ const initChart = () => {
     },
     yAxis: {
       type: 'value',
-      min: 80,
+      min: 0, // ✅ 修改为0，确保所有数据都能显示
       max: 100,
       axisLabel: {
         formatter: '{value}%',
@@ -234,9 +257,10 @@ const initChart = () => {
         data: diagnosisData.map(d => ({
           value: d.accuracy,
           itemStyle: {
+            // ✅ 使用经典蓝色渐变配色，统一风格
             color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-              { offset: 0, color: d.accuracy >= 91.2 ? '#67c23a' : '#e6a23c' },
-              { offset: 1, color: d.accuracy >= 91.2 ? '#85ce61' : '#ebb563' },
+              { offset: 0, color: '#5470c6' },  // 顶部：深蓝色
+              { offset: 1, color: '#91cc75' },  // 底部：浅绿色
             ]),
           },
         })),
@@ -246,14 +270,15 @@ const initChart = () => {
           position: 'top',
           formatter: '{c}%',
           fontSize: 11,
+          color: '#333',
         },
         markLine: {
           symbol: 'none',
           data: [
             {
-              yAxis: 91.2,
+              yAxis: 87.1,
               label: {
-                formatter: '平均: 91.2%',
+                formatter: '平均: 87.1%',
                 position: 'end',
               },
               lineStyle: {

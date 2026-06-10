@@ -3,7 +3,7 @@
     <el-card shadow="never" class="page-header">
       <template #header>
         <div class="card-header">
-          <span class="title">小组质控</span>
+          <span class="title">妇产科病案质控报告</span>
           <el-breadcrumb separator="/">
             <el-breadcrumb-item :to="{ path: '/quality' }">病历质控</el-breadcrumb-item>
             <el-breadcrumb-item>小组质控</el-breadcrumb-item>
@@ -12,562 +12,513 @@
       </template>
     </el-card>
 
-    <!-- 小组卡片网格 -->
-    <el-row :gutter="20" class="group-grid">
+    <!-- 三个大组卡片 -->
+    <el-row :gutter="30" class="group-grid">
       <el-col 
         v-for="group in groups" 
         :key="group.id"
         :xs="24" 
         :sm="12" 
-        :md="8" 
-        :lg="6"
+        :md="8"
       >
         <el-card 
           shadow="hover" 
-          class="group-card"
+          class="group-card-large"
           @click="handleViewGroupReport(group)"
         >
-          <div class="group-content">
-            <div class="group-header">
-              <div class="group-avatar" :style="{ background: group.color }">
-                {{ group.name.charAt(0) }}
+          <div class="group-content-large">
+            <div class="group-icon" :style="{ background: group.color }">
+              <el-icon :size="60"><component :is="group.icon" /></el-icon>
+            </div>
+            <div class="group-title">{{ group.name }}</div>
+            <div class="group-desc">{{ group.description }}</div>
+            <div class="group-stats-large">
+              <div class="stat-large">
+                <div class="stat-label">成员数</div>
+                <div class="stat-value">{{ group.memberCount }}人</div>
               </div>
-              <div class="group-info">
-                <div class="group-name">{{ group.name }}</div>
-                <div class="group-members">{{ group.memberCount }}人</div>
+              <div class="stat-large">
+                <div class="stat-label">质控分数</div>
+                <div class="stat-value score" :class="getScoreClass(group.score)">{{ group.score }}</div>
               </div>
             </div>
-            
-            <div class="group-score-section">
-              <div class="score-label">质控分数</div>
-              <div class="score-value" :class="getScoreClass(group.score)">
-                {{ group.score }}
-              </div>
-              <el-progress 
-                :percentage="group.score" 
-                :color="getProgressColor(group.score)"
-                :stroke-width="8"
-                :show-text="false"
-              />
-            </div>
-            
-            <div class="group-stats">
-              <div class="stat-item">
-                <div class="stat-label">完成数</div>
-                <div class="stat-value">{{ group.completedCount }}</div>
-              </div>
-              <div class="stat-item">
-                <div class="stat-label">正确率</div>
-                <div class="stat-value">{{ group.accuracy }}%</div>
-              </div>
-            </div>
-            
-            <div class="group-footer">
-              <el-button type="primary" size="small" plain>
-                查看报告
-                <el-icon><ArrowRight /></el-icon>
-              </el-button>
-            </div>
+            <el-button type="primary" size="large" class="view-report-btn">
+              <el-icon><Document /></el-icon>
+              查看完整报告
+            </el-button>
           </div>
         </el-card>
       </el-col>
     </el-row>
 
-    <!-- 小组质控报告弹窗 -->
+    <!-- 大型报告弹窗 -->
     <el-dialog 
       v-model="reportDialogVisible" 
-      :title="currentGroup?.name + ' - 质控报告'"
-      width="90%"
-      top="5vh"
-      class="report-dialog"
+      :title="currentGroup?.name + ' - 详细质控报告'"
+      width="95%"
+      top="3vh"
+      class="large-report-dialog"
     >
-      <div v-if="currentGroup" class="report-content">
-        <el-row :gutter="20">
-          <!-- 左侧：质控报告内容 -->
-          <el-col :xs="24" :lg="14">
-            <el-card shadow="never" class="report-card">
-              <template #header>
-                <div class="report-header">
-                  <el-icon><Document /></el-icon>
-                  <span>质控报告详情</span>
-                </div>
-              </template>
+      <div v-if="currentGroup" class="large-report-content">
+        <!-- 报告头部信息 -->
+        <div class="report-banner" :style="{ background: currentGroup.color }">
+          <div class="banner-content">
+            <h1 class="banner-title">{{ currentGroup.name }}</h1>
+            <p class="banner-subtitle">{{ currentGroup.reportTitle }}</p>
+            <div class="banner-meta">
+              <span>报告编号：OB-QC-2026-001</span>
+              <span>质控日期：2026年6月8日</span>
+              <span>患者姓名：小丽（化名）</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 报告主体内容 -->
+        <div class="report-body-body">
+          <!-- 仁心仁术组：病案编码质控结果 -->
+          <div v-if="currentGroup.id === 1" class="report-section-large">
+            <h2 class="section-heading">
+              <el-icon :size="32"><CircleCheckFilled /></el-icon>
+              二、病案编码质控结果
+            </h2>
+
+            <!-- 主要诊断修正 -->
+            <div class="subsection">
+              <h3 class="subsection-title">1. 主要诊断修正</h3>
+              <el-table :data="mainDiagnosisData" border class="large-table">
+                <el-table-column prop="item" label="项目" width="120" align="center">
+                  <template #default="{ row }">
+                    <strong>{{ row.item }}</strong>
+                  </template>
+                </el-table-column>
+                <el-table-column prop="original" label="原诊断及编码" min-width="200">
+                  <template #default="{ row }">
+                    <span class="original-text">{{ row.original }}</span>
+                  </template>
+                </el-table-column>
+                <el-table-column prop="correct" label="正确诊断及编码" min-width="200">
+                  <template #default="{ row }">
+                    <span class="correct-text">{{ row.correct }}</span>
+                  </template>
+                </el-table-column>
+                <el-table-column prop="basis" label="修正依据" min-width="300">
+                  <template #default="{ row }">
+                    <div class="basis-content">{{ row.basis }}</div>
+                  </template>
+                </el-table-column>
+              </el-table>
+            </div>
+
+            <!-- 其他诊断修正与补充 -->
+            <div class="subsection">
+              <h3 class="subsection-title">2. 其他诊断修正与补充</h3>
+              <el-table :data="otherDiagnosisData" border class="large-table">
+                <el-table-column prop="original" label="原诊断" width="150" />
+                <el-table-column prop="originalCode" label="原编码" width="120" align="center" />
+                <el-table-column prop="corrected" label="修正后诊断" min-width="200">
+                  <template #default="{ row }">
+                    <span class="corrected-text">{{ row.corrected }}</span>
+                  </template>
+                </el-table-column>
+                <el-table-column prop="correctedCode" label="修正后编码" width="150" align="center" />
+                <el-table-column prop="explanation" label="修正说明" min-width="250" />
+              </el-table>
               
-              <div class="report-content">
-                <!-- 基本信息 -->
-                <section class="report-section">
-                  <h3 class="section-title">
-                    <el-icon><InfoFilled /></el-icon>
-                    基本信息
-                  </h3>
-                  <el-descriptions :column="2" border>
-                    <el-descriptions-item label="小组名称">{{ currentGroup.name }}</el-descriptions-item>
-                    <el-descriptions-item label="成员数量">{{ currentGroup.memberCount }}人</el-descriptions-item>
-                    <el-descriptions-item label="质控周期">2024-01-01 至 2024-01-31</el-descriptions-item>
-                    <el-descriptions-item label="质控状态">
-                      <el-tag :type="currentGroup.score >= 90 ? 'success' : currentGroup.score >= 80 ? 'warning' : 'danger'">
-                        {{ currentGroup.score >= 90 ? '优秀' : currentGroup.score >= 80 ? '良好' : '需改进' }}
-                      </el-tag>
-                    </el-descriptions-item>
-                  </el-descriptions>
-                </section>
+              <el-alert
+                title="注：胎盘粘连伴出血（O72.001）、妊娠合并羊水过少（O41.001）编码正确，无需修改。"
+                type="info"
+                :closable="false"
+                style="margin-top: 16px; font-size: 16px;"
+              />
+            </div>
 
-                <!-- 质控统计 -->
-                <section class="report-section">
-                  <h3 class="section-title">
-                    <el-icon><DataAnalysis /></el-icon>
-                    质控统计
-                  </h3>
-                  <el-row :gutter="16">
-                    <el-col :span="8">
-                      <div class="stat-box">
-                        <div class="stat-box-label">总病历数</div>
-                        <div class="stat-box-value">{{ currentGroup.totalRecords }}</div>
-                      </div>
-                    </el-col>
-                    <el-col :span="8">
-                      <div class="stat-box">
-                        <div class="stat-box-label">已完成</div>
-                        <div class="stat-box-value success">{{ currentGroup.completedCount }}</div>
-                      </div>
-                    </el-col>
-                    <el-col :span="8">
-                      <div class="stat-box">
-                        <div class="stat-box-label">待完善</div>
-                        <div class="stat-box-value warning">{{ currentGroup.totalRecords - currentGroup.completedCount }}</div>
-                      </div>
-                    </el-col>
-                  </el-row>
-                  
-                  <el-table :data="currentGroup.diagnosisStats" style="margin-top: 16px" size="small" border>
-                    <el-table-column prop="diagnosis" label="诊断名称" min-width="180" />
-                    <el-table-column prop="count" label="出现次数" width="100" align="center" />
-                    <el-table-column prop="accuracy" label="编码正确率" width="120" align="center">
-                      <template #default="{ row }">
-                        <el-tag :type="row.accuracy >= 90 ? 'success' : row.accuracy >= 80 ? 'warning' : 'danger'">
-                          {{ row.accuracy }}%
-                        </el-tag>
-                      </template>
-                    </el-table-column>
-                    <el-table-column prop="issues" label="问题数" width="100" align="center" />
-                  </el-table>
-                </section>
-
-                <!-- 常见问题 -->
-                <section class="report-section">
-                  <h3 class="section-title">
-                    <el-icon><Warning /></el-icon>
-                    常见问题分析
-                  </h3>
-                  <el-timeline>
-                    <el-timeline-item 
-                      v-for="(issue, index) in currentGroup.commonIssues" 
-                      :key="index"
-                      :timestamp="issue.date"
-                      placement="top"
-                    >
-                      <el-card shadow="never">
-                        <h4>{{ issue.title }}</h4>
-                        <p>{{ issue.description }}</p>
-                        <div class="issue-meta">
-                          <el-tag size="small" :type="issue.severity === 'high' ? 'danger' : issue.severity === 'medium' ? 'warning' : 'info'">
-                            {{ issue.severity === 'high' ? '严重' : issue.severity === 'medium' ? '中等' : '轻微' }}
-                          </el-tag>
-                          <span class="frequency">出现频率: {{ issue.frequency }}次</span>
-                        </div>
-                      </el-card>
-                    </el-timeline-item>
-                  </el-timeline>
-                </section>
-              </div>
-            </el-card>
-          </el-col>
-
-          <!-- 右侧：AI修改意见 -->
-          <el-col :xs="24" :lg="10">
-            <el-card shadow="never" class="ai-suggestion-card">
-              <template #header>
-                <div class="report-header">
-                  <el-icon><Cpu /></el-icon>
-                  <span>AI智能建议</span>
-                  <el-tag type="success" effect="plain" size="small">基于深度学习</el-tag>
-                </div>
-              </template>
+            <!-- 手术操作编码核查 -->
+            <div class="subsection">
+              <h3 class="subsection-title">3. 手术操作编码核查</h3>
+              <el-table :data="operationData" border class="large-table">
+                <el-table-column prop="operation" label="手术操作" min-width="250" />
+                <el-table-column prop="code" label="原编码" width="150" align="center" />
+                <el-table-column prop="accurate" label="是否准确" width="120" align="center">
+                  <template #default="{ row }">
+                    <el-tag type="success" size="large">{{ row.accurate }}</el-tag>
+                  </template>
+                </el-table-column>
+                <el-table-column prop="remark" label="备注" min-width="200" />
+              </el-table>
               
-              <div class="ai-suggestions">
-                <el-alert
-                  title="以下建议由AI自动生成，仅供参考"
-                  type="info"
-                  :closable="false"
-                  show-icon
-                  class="mb-4"
-                />
+              <el-alert
+                title="结论：手术操作编码全部正确，无需修正。"
+                type="success"
+                :closable="false"
+                style="margin-top: 16px; font-size: 18px; font-weight: bold;"
+              />
+            </div>
+          </div>
 
-                <!-- 总体评价 -->
-                <div class="suggestion-block">
-                  <h4 class="block-title">
-                    <el-icon><Star /></el-icon>
-                    总体评价
-                  </h4>
-                  <div class="block-content">
-                    <p>{{ currentGroup.aiEvaluation.overall }}</p>
-                    <div class="score-breakdown">
-                      <div class="score-item">
-                        <span>诊断准确性</span>
-                        <el-progress 
-                          :percentage="currentGroup.aiEvaluation.scores.diagnosis" 
-                          :color="getProgressColor(currentGroup.aiEvaluation.scores.diagnosis)"
-                        />
-                      </div>
-                      <div class="score-item">
-                        <span>编码规范性</span>
-                        <el-progress 
-                          :percentage="currentGroup.aiEvaluation.scores.coding" 
-                          :color="getProgressColor(currentGroup.aiEvaluation.scores.coding)"
-                        />
-                      </div>
-                      <div class="score-item">
-                        <span>记录完整性</span>
-                        <el-progress 
-                          :percentage="currentGroup.aiEvaluation.scores.completeness" 
-                          :color="getProgressColor(currentGroup.aiEvaluation.scores.completeness)"
-                        />
-                      </div>
+          <!-- 精益求精组：DRG入组逻辑与结果分析 -->
+          <div v-if="currentGroup.id === 2" class="report-section-large">
+            <h2 class="section-heading">
+              <el-icon :size="32"><TrendCharts /></el-icon>
+              三、DRG入组逻辑与结果分析
+            </h2>
+
+            <!-- 修正前后入组路径对比 -->
+            <div class="subsection">
+              <h3 class="subsection-title">1. 修正前后入组路径对比</h3>
+              <el-table :data="drgComparisonData" border class="large-table comparison-table">
+                <el-table-column prop="item" label="项目" width="150" align="center">
+                  <template #default="{ row }">
+                    <strong>{{ row.item }}</strong>
+                  </template>
+                </el-table-column>
+                <el-table-column prop="before" label="修正前（错误主诊）" min-width="250">
+                  <template #default="{ row }">
+                    <div class="before-cell">{{ row.before }}</div>
+                  </template>
+                </el-table-column>
+                <el-table-column prop="after" label="修正后（正确主诊）" min-width="250">
+                  <template #default="{ row }">
+                    <div class="after-cell">{{ row.after }}</div>
+                  </template>
+                </el-table-column>
+              </el-table>
+            </div>
+
+            <!-- 权重与支付差异 -->
+            <div class="subsection">
+              <h3 class="subsection-title">2. 权重与支付差异</h3>
+              <el-table :data="paymentData" border class="large-table">
+                <el-table-column prop="drgGroup" label="DRG组" width="120" align="center">
+                  <template #default="{ row }">
+                    <el-tag :type="row.type" size="large">{{ row.drgGroup }}</el-tag>
+                  </template>
+                </el-table-column>
+                <el-table-column prop="rw" label="相对权重（RW）参考" width="200" align="center" />
+                <el-table-column prop="payment" label="预估支付（按某地区费率）" min-width="200" />
+                <el-table-column prop="impact" label="盈亏影响" min-width="150">
+                  <template #default="{ row }">
+                    <el-tag :type="row.impactType" size="large">{{ row.impact }}</el-tag>
+                  </template>
+                </el-table-column>
+              </el-table>
+              
+              <el-alert
+                title="注：实际权重以当地医保DRG付费方案为准。本案例中，错误分组可导致权重损失约50%，单例亏损可达数千元。"
+                type="warning"
+                :closable="false"
+                style="margin-top: 16px; font-size: 16px;"
+              />
+            </div>
+
+            <!-- DRG入组错误原因总结 -->
+            <div class="subsection">
+              <h3 class="subsection-title">3. DRG入组错误原因总结</h3>
+              <el-card shadow="never" class="summary-card">
+                <el-icon :size="24" color="#e6a23c"><WarningFilled /></el-icon>
+                <p class="summary-text">
+                  主要诊断误选为"瘢痕子宫"（N编码），未按产科原则选择"梗阻性分娩"（O编码）。
+                </p>
+              </el-card>
+            </div>
+          </div>
+
+          <!-- 开拓进取组：绩效影响与风险分析 + 质控改进建议 -->
+          <div v-if="currentGroup.id === 3" class="report-section-large">
+            <h2 class="section-heading">
+              <el-icon :size="32"><Monitor /></el-icon>
+              四、绩效影响与风险分析
+            </h2>
+
+            <!-- 经济绩效影响 -->
+            <div class="subsection">
+              <h3 class="subsection-title">1. 经济绩效影响</h3>
+              <el-row :gutter="20">
+                <el-col :span="12">
+                  <el-card shadow="hover" class="impact-card loss">
+                    <div class="impact-icon">
+                      <el-icon :size="48"><Money /></el-icon>
                     </div>
-                  </div>
-                </div>
+                    <h4>直接医保收入损失</h4>
+                    <p class="impact-detail">
+                      以OB23权重2.0、费率10000元/权重计，正确入组可获约<strong>20000元</strong>；
+                      NZ13权重0.9，仅获约<strong>9000元</strong>。
+                    </p>
+                    <div class="loss-amount">单例潜在亏损约11000元</div>
+                  </el-card>
+                </el-col>
+                <el-col :span="12">
+                  <el-card shadow="hover" class="impact-card performance">
+                    <div class="impact-icon">
+                      <el-icon :size="48"><Trophy /></el-icon>
+                    </div>
+                    <h4>科室绩效评价</h4>
+                    <p class="impact-detail">
+                      CMI值、总权重、结余率均受负面影响，长期影响科室运营。
+                    </p>
+                  </el-card>
+                </el-col>
+              </el-row>
+            </div>
 
-                <!-- 改进建议 -->
-                <div class="suggestion-block">
-                  <h4 class="block-title">
-                    <el-icon><EditPen /></el-icon>
-                    改进建议
-                  </h4>
-                  <div class="block-content">
-                    <el-collapse accordion>
-                      <el-collapse-item 
-                        v-for="(suggestion, index) in currentGroup.aiEvaluation.suggestions" 
-                        :key="index"
-                        :title="suggestion.title"
-                      >
-                        <div class="suggestion-detail">
-                          <p class="suggestion-desc">{{ suggestion.description }}</p>
-                          <div class="suggestion-actions">
-                            <el-tag size="small" :type="getSuggestionType(suggestion.priority)">
-                              {{ suggestion.priority === 'high' ? '优先处理' : suggestion.priority === 'medium' ? '建议处理' : '可选优化' }}
-                            </el-tag>
-                            <span class="impact">预期提升: +{{ suggestion.expectedImprovement }}分</span>
-                          </div>
-                        </div>
-                      </el-collapse-item>
-                    </el-collapse>
-                  </div>
-                </div>
+            <!-- 质控合规风险 -->
+            <div class="subsection">
+              <h3 class="subsection-title">2. 质控合规风险</h3>
+              <el-alert
+                title='医保飞行检查或病案评审若发现主诊断选择错误，可能判定为“高编高靠”或“低编低靠”，面临拒付、扣款甚至行政处罚。'
+                type="error"
+                :closable="false"
+                style="margin-bottom: 16px; font-size: 16px;"
+              />
+              <el-alert
+                title="医院质量考核指标（如主要诊断正确率）不达标，影响等级评审。"
+                type="warning"
+                :closable="false"
+                style="font-size: 16px;"
+              />
+              
+              <el-card shadow="never" class="conclusion-card">
+                <el-icon :size="28" color="#67c23a"><CircleCheck /></el-icon>
+                <p class="conclusion-text">
+                  结论：病案质控必须坚持规则优先；同时应加强编码员与临床医生的沟通培训，建立互信机制。
+                </p>
+              </el-card>
+            </div>
 
-                <!-- 学习资源推荐 -->
-                <div class="suggestion-block">
-                  <h4 class="block-title">
-                    <el-icon><Reading /></el-icon>
-                    学习资源推荐
-                  </h4>
-                  <div class="block-content">
-                    <ul class="resource-list">
-                      <li v-for="(resource, index) in currentGroup.aiEvaluation.resources" :key="index">
-                        <el-link :href="resource.url" target="_blank" type="primary">
-                          <el-icon><Link /></el-icon>
-                          {{ resource.title }}
-                        </el-link>
-                        <span class="resource-type">{{ resource.type }}</span>
-                      </li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
-            </el-card>
-          </el-col>
-        </el-row>
+            <!-- 质控改进建议 -->
+            <h2 class="section-heading" style="margin-top: 40px;">
+              <el-icon :size="32"><MagicStick /></el-icon>
+              五、质控改进建议
+            </h2>
+
+            <el-row :gutter="20">
+              <el-col :span="8">
+                <el-card shadow="hover" class="suggestion-card-large">
+                  <div class="suggestion-number">1</div>
+                  <h4>编码技术与培训</h4>
+                  <ul class="suggestion-list">
+                    <li>每季度开展产科主要诊断选择专项培训，重点讲解"梗阻性分娩""剖宫产指征"的编码规则。</li>
+                    <li>编制产科常见错误案例集（如本案例），纳入住院医师及编码员继续教育。</li>
+                  </ul>
+                </el-card>
+              </el-col>
+              <el-col :span="8">
+                <el-card shadow="hover" class="suggestion-card-large">
+                  <div class="suggestion-number">2</div>
+                  <h4>流程与机制</h4>
+                  <ul class="suggestion-list">
+                    <li>在电子病历系统中增设产科主诊断规则提示：当医生写入"瘢痕子宫"且同时存在剖宫产、梗阻性分娩征象时，系统自动弹窗提醒。</li>
+                  </ul>
+                </el-card>
+              </el-col>
+              <el-col :span="8">
+                <el-card shadow="hover" class="suggestion-card-large">
+                  <div class="suggestion-number">3</div>
+                  <h4>持续监测</h4>
+                  <ul class="suggestion-list">
+                    <li>每月抽取产科出院病案，对比原分组与质控后分组，计算DRG组变动率及权重偏差率，纳入质控通报。</li>
+                  </ul>
+                </el-card>
+              </el-col>
+            </el-row>
+          </div>
+        </div>
       </div>
       
       <template #footer>
-        <el-button @click="reportDialogVisible = false">关闭</el-button>
-        <el-button type="primary" @click="handleExportReport">导出报告</el-button>
+        <el-button size="large" @click="reportDialogVisible = false">关闭报告</el-button>
+        <el-button type="primary" size="large" @click="handleExportReport">
+          <el-icon><Download /></el-icon>
+          导出PDF报告
+        </el-button>
       </template>
     </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
-  ArrowRight, Document, InfoFilled, DataAnalysis, Warning,
-  Cpu, Star, EditPen, Reading, Link
+  Document, CircleCheckFilled, TrendCharts, Monitor, WarningFilled,
+  Money, Trophy, Check, MagicStick, Download
 } from '@element-plus/icons-vue'
 
-// 小组数据
+// 三个大组数据
 const groups = ref([
   {
     id: 1,
-    name: '第一小组',
-    memberCount: 7,
+    name: '仁心仁术组',
+    description: '病案编码质控专家',
+    reportTitle: '二、病案编码质控结果',
+    icon: 'VerifiedUser',
+    memberCount: 14,
     score: 94.5,
-    completedCount: 42,
-    accuracy: 92.8,
-    totalRecords: 45,
     color: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    diagnosisStats: [
-      { diagnosis: '瘢痕子宫N85.805', count: 12, accuracy: 95.2, issues: 1 },
-      { diagnosis: '梗阻性分娩O66.901', count: 8, accuracy: 88.5, issues: 2 },
-      { diagnosis: '孕39周O26.900x506', count: 15, accuracy: 92.8, issues: 1 },
-      { diagnosis: '胎盘粘连伴出血O72.001', count: 6, accuracy: 93.4, issues: 0 },
-    ],
-    commonIssues: [
-      {
-        date: '2024-01-28',
-        title: '诊断编码填写不规范',
-        description: '部分成员在填写ICD-10编码时未按照标准格式，导致系统识别困难。建议统一编码填写规范。',
-        severity: 'high',
-        frequency: 8,
-      },
-      {
-        date: '2024-01-25',
-        title: '现病史描述不够详细',
-        description: '现病史部分缺少关键的时间节点和症状演变过程，影响诊断的准确性判断。',
-        severity: 'medium',
-        frequency: 12,
-      },
-      {
-        date: '2024-01-20',
-        title: '辅助检查结果缺失',
-        description: '部分病历未完整记录实验室检查和影像学检查结果，需要补充完善。',
-        severity: 'medium',
-        frequency: 6,
-      },
-    ],
-    aiEvaluation: {
-      overall: '该小组整体表现优秀，病历书写质量较高，诊断编码准确率处于领先水平。但在细节把控上仍有提升空间，特别是在现病史描述的完整性和辅助检查结果的记录方面。',
-      scores: {
-        diagnosis: 94,
-        coding: 92,
-        completeness: 88,
-      },
-      suggestions: [
-        {
-          title: '加强现病史书写培训',
-          description: '建议组织专项培训，重点讲解现病史书写的要点和规范，包括时间顺序、症状演变、诊疗经过等关键要素的记录方法。',
-          priority: 'high',
-          expectedImprovement: 3,
-        },
-        {
-          title: '建立编码审核机制',
-          description: '建议在提交前增加编码自查环节，可以使用系统提供的编码验证工具进行预检，减少编码错误率。',
-          priority: 'high',
-          expectedImprovement: 2,
-        },
-        {
-          title: '完善辅助检查记录模板',
-          description: '建议优化病历模板，将常用辅助检查项目设为必填项，确保检查结果的完整性。',
-          priority: 'medium',
-          expectedImprovement: 2,
-        },
-        {
-          title: '开展病例讨论活动',
-          description: '建议定期组织疑难病例讨论，通过集体学习提高全组的诊断思维和病历书写水平。',
-          priority: 'low',
-          expectedImprovement: 1,
-        },
-      ],
-      resources: [
-        {
-          title: 'ICD-10编码规范手册（2024版）',
-          type: '文档',
-          url: '#',
-        },
-        {
-          title: '病历书写质量标准解读',
-          type: '视频课程',
-          url: '#',
-        },
-        {
-          title: '妇产科常见疾病诊断要点',
-          type: '学习资料',
-          url: '#',
-        },
-      ],
-    },
   },
   {
     id: 2,
-    name: '第二小组',
-    memberCount: 8,
+    name: '精益求精组',
+    description: 'DRG入组逻辑分析',
+    reportTitle: '三、DRG入组逻辑与结果分析',
+    icon: 'TrendCharts',
+    memberCount: 14,
     score: 91.2,
-    completedCount: 38,
-    accuracy: 90.5,
-    totalRecords: 42,
     color: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-    diagnosisStats: [
-      { diagnosis: '妊娠合并羊水过少O41.001', count: 10, accuracy: 91.6, issues: 1 },
-      { diagnosis: '女性盆腔炎N73.901', count: 7, accuracy: 87.3, issues: 2 },
-      { diagnosis: '轻度贫血D64.906', count: 14, accuracy: 94.8, issues: 0 },
-    ],
-    commonIssues: [
-      {
-        date: '2024-01-27',
-        title: '诊断依据不充分',
-        description: '部分诊断缺少必要的临床依据支持，如实验室检查结果或影像学证据。',
-        severity: 'high',
-        frequency: 5,
-      },
-    ],
-    aiEvaluation: {
-      overall: '第二小组表现良好，基本掌握了病历书写规范。主要问题在于诊断依据的充分性，需要加强对临床思维的训练。',
-      scores: {
-        diagnosis: 90,
-        coding: 89,
-        completeness: 92,
-      },
-      suggestions: [
-        {
-          title: '强化诊断依据训练',
-          description: '每个诊断都应有相应的临床表现、检查结果作为支撑，避免主观臆断。',
-          priority: 'high',
-          expectedImprovement: 3,
-        },
-      ],
-      resources: [
-        {
-          title: '临床诊断思维训练',
-          type: '在线课程',
-          url: '#',
-        },
-      ],
-    },
   },
   {
     id: 3,
-    name: '第三小组',
-    memberCount: 6,
-    score: 88.7,
-    completedCount: 35,
-    accuracy: 87.9,
-    totalRecords: 40,
+    name: '开拓进取组',
+    description: '绩效分析与改进建议',
+    reportTitle: '四、绩效影响与风险分析 / 五、质控改进建议',
+    icon: 'Monitor',
+    memberCount: 15,
+    score: 89.8,
     color: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
-    diagnosisStats: [
-      { diagnosis: '低钾血症E87.601', count: 9, accuracy: 89.2, issues: 1 },
-      { diagnosis: '真菌性阴道炎B37.304', count: 11, accuracy: 90.4, issues: 1 },
-    ],
-    commonIssues: [],
-    aiEvaluation: {
-      overall: '第三小组有较大提升空间，需要在编码准确性和病历完整性方面加强训练。',
-      scores: {
-        diagnosis: 87,
-        coding: 86,
-        completeness: 90,
-      },
-      suggestions: [],
-      resources: [],
-    },
-  },
-  {
-    id: 4,
-    name: '第四小组',
-    memberCount: 7,
-    score: 92.8,
-    completedCount: 40,
-    accuracy: 91.5,
-    totalRecords: 43,
-    color: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
-    diagnosisStats: [],
-    commonIssues: [],
-    aiEvaluation: {
-      overall: '第四小组表现稳定，各项指标均衡。',
-      scores: {
-        diagnosis: 92,
-        coding: 91,
-        completeness: 93,
-      },
-      suggestions: [],
-      resources: [],
-    },
-  },
-  {
-    id: 5,
-    name: '第五小组',
-    memberCount: 8,
-    score: 89.5,
-    completedCount: 37,
-    accuracy: 88.7,
-    totalRecords: 41,
-    color: 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)',
-    diagnosisStats: [],
-    commonIssues: [],
-    aiEvaluation: {
-      overall: '第五小组需要关注编码准确性的提升。',
-      scores: {
-        diagnosis: 88,
-        coding: 87,
-        completeness: 91,
-      },
-      suggestions: [],
-      resources: [],
-    },
-  },
-  {
-    id: 6,
-    name: '第六小组',
-    memberCount: 7,
-    score: 90.3,
-    completedCount: 39,
-    accuracy: 89.8,
-    totalRecords: 42,
-    color: 'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)',
-    diagnosisStats: [],
-    commonIssues: [],
-    aiEvaluation: {
-      overall: '第六小组表现中规中矩，有进一步提升的空间。',
-      scores: {
-        diagnosis: 89,
-        coding: 88,
-        completeness: 92,
-      },
-      suggestions: [],
-      resources: [],
-    },
   },
 ])
 
-// 弹窗相关
+// 弹窗状态
 const reportDialogVisible = ref(false)
 const currentGroup = ref<any>(null)
 
-// 查看小组报告
+// 主要诊断修正数据
+const mainDiagnosisData = [
+  {
+    item: '主要诊断',
+    original: '瘢痕子宫（N85.805）',
+    correct: '子宫瘢痕引起的梗阻性分娩（O65.500x002）',
+    basis: '1.产科主要诊断应选择产科的主要并发症或合并症，且影响产程进展的情况作为主诊（参见规范第十四条及原则第2条。\n2.瘢痕子宫仅为病因表述，不应作为本次分娩住院的主要诊断。',
+  },
+]
+
+// 其他诊断修正数据
+const otherDiagnosisData = [
+  {
+    original: '梗阻性分娩',
+    originalCode: 'O66.901',
+    corrected: '无需单独列出（已纳入主诊断）',
+    correctedCode: '——',
+    explanation: '主诊断已明确为"子宫瘢痕引起的梗阻性分娩"，不再重复编码非特异性梗阻性分娩。',
+  },
+  {
+    original: '女性盆腔炎',
+    originalCode: 'N73.901',
+    corrected: '妊娠合并盆腔炎',
+    correctedCode: 'O23.501',
+    explanation: '盆腔炎发生于妊娠期，应使用O编码（妊娠合并感染性疾病）。',
+  },
+  {
+    original: '轻度贫血',
+    originalCode: 'D64.906',
+    corrected: '妊娠合并轻度贫血',
+    correctedCode: 'O99.005',
+    explanation: '贫血与妊娠相关，应使用O99.-编码。',
+  },
+  {
+    original: '低钾血症',
+    originalCode: 'E87.601',
+    corrected: '妊娠合并低钾血症',
+    correctedCode: 'O99.205',
+    explanation: '电解质紊乱发生于妊娠期，应归入O99.2。',
+  },
+  {
+    original: '真菌性阴道炎',
+    originalCode: 'B37.304',
+    corrected: '妊娠合并真菌性阴道炎',
+    correctedCode: 'O98.800x002',
+    explanation: '妊娠期阴道感染，应使用O98（孕产妇其他感染性疾病）。',
+  },
+  {
+    original: '漏编诊断',
+    originalCode: '无',
+    corrected: '在医院内出生的单胎活产婴儿',
+    correctedCode: 'Z38.000x001',
+    explanation: '母婴同室病案需补充新生儿出生状况编码（Z38），用于产科与新生儿统计。',
+  },
+]
+
+// 手术操作编码数据
+const operationData = [
+  {
+    operation: '剖宫产术（子宫下段横切口）',
+    code: '74.1x01',
+    accurate: '是',
+    remark: '——',
+  },
+  {
+    operation: '盆腔粘连松解术',
+    code: '54.5904',
+    accurate: '是',
+    remark: '——',
+  },
+  {
+    operation: '手取胎盘',
+    code: '75.4x00y002',
+    accurate: '是',
+    remark: '需注意该编码归类于"其他产科操作"，无遗漏。',
+  },
+]
+
+// DRG对比数据
+const drgComparisonData = [
+  {
+    item: '主要诊断',
+    before: '瘢痕子宫（N85.805）',
+    after: '子宫瘢痕引起的梗阻性分娩（O65.500x002）',
+  },
+  {
+    item: 'MDC',
+    before: 'MDCN（女性生殖系统疾病）',
+    after: 'MDCO（妊娠、分娩及产褥期）',
+  },
+  {
+    item: 'ADRG判定',
+    before: '虽有剖宫产术，但MDCN无产科剖宫产组，按盆腔手术入NZ组',
+    after: '在MDCO内，有剖宫产手术 → OC组（剖宫产术）',
+  },
+  {
+    item: 'DRG细分组',
+    before: '存在胎盘粘连伴出血等合并症（CC）→ NZ13',
+    after: '存在一般合并症（CC）→ OB23',
+  },
+  {
+    item: '最终DRG',
+    before: 'NZ13（女性生殖系统其他疾患，伴合并症）',
+    after: 'OB23（剖宫产术，伴一般合并症或并发症）',
+  },
+]
+
+// 支付差异数据
+const paymentData = [
+  {
+    drgGroup: 'NZ13',
+    rw: '约0.8 ~ 1.0',
+    payment: '偏低',
+    impact: '亏损风险',
+    type: 'danger',
+    impactType: 'danger',
+  },
+  {
+    drgGroup: 'OB23',
+    rw: '约1.6 ~ 2.0',
+    payment: '显著提高',
+    impact: '合理补偿',
+    type: 'success',
+    impactType: 'success',
+  },
+]
+
+// 查看报告
 const handleViewGroupReport = (group: any) => {
   currentGroup.value = group
   reportDialogVisible.value = true
 }
 
-// 获取分数样式类
+// 获取分数样式
 const getScoreClass = (score: number) => {
   if (score >= 90) return 'excellent'
   if (score >= 80) return 'good'
   return 'average'
-}
-
-// 获取进度条颜色
-const getProgressColor = (score: number) => {
-  if (score >= 90) return '#67c23a'
-  if (score >= 80) return '#e6a23c'
-  return '#f56c6c'
-}
-
-// 获取建议类型
-const getSuggestionType = (priority: string) => {
-  const types: Record<string, any> = {
-    high: 'danger',
-    medium: 'warning',
-    low: 'info',
-  }
-  return types[priority] || 'info'
 }
 
 // 导出报告
@@ -581,7 +532,7 @@ const handleExportReport = () => {
   padding: 20px;
   
   .page-header {
-    margin-bottom: 20px;
+    margin-bottom: 30px;
     
     .card-header {
       display: flex;
@@ -589,296 +540,358 @@ const handleExportReport = () => {
       align-items: center;
       
       .title {
-        font-size: 20px;
-        font-weight: 600;
+        font-size: 28px;
+        font-weight: 700;
         color: #303133;
       }
     }
   }
   
   .group-grid {
-    .group-card {
+    .group-card-large {
       cursor: pointer;
-      transition: all 0.3s;
-      border-radius: 12px;
-      overflow: hidden;
+      transition: all 0.3s ease;
+      height: 100%;
       
       &:hover {
         transform: translateY(-8px);
         box-shadow: 0 12px 32px rgba(0, 0, 0, 0.15);
       }
       
-      .group-content {
-        .group-header {
+      .group-content-large {
+        text-align: center;
+        padding: 30px 20px;
+        
+        .group-icon {
+          width: 120px;
+          height: 120px;
+          border-radius: 24px;
           display: flex;
           align-items: center;
-          gap: 12px;
-          margin-bottom: 16px;
-          
-          .group-avatar {
-            width: 48px;
-            height: 48px;
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 20px;
-            font-weight: 700;
-            flex-shrink: 0;
-          }
-          
-          .group-info {
-            flex: 1;
-            
-            .group-name {
-              font-size: 16px;
-              font-weight: 600;
-              color: #303133;
-              margin-bottom: 4px;
-            }
-            
-            .group-members {
-              font-size: 13px;
-              color: #909399;
-            }
-          }
+          justify-content: center;
+          margin: 0 auto 24px;
+          color: white;
+          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
         }
         
-        .group-score-section {
-          margin-bottom: 16px;
-          padding: 12px;
-          background: #f5f7fa;
-          border-radius: 8px;
-          
-          .score-label {
-            font-size: 12px;
-            color: #909399;
-            margin-bottom: 8px;
-          }
-          
-          .score-value {
-            font-size: 32px;
-            font-weight: 700;
-            margin-bottom: 8px;
-            
-            &.excellent {
-              color: #67c23a;
-            }
-            
-            &.good {
-              color: #e6a23c;
-            }
-            
-            &.average {
-              color: #f56c6c;
-            }
-          }
+        .group-title {
+          font-size: 32px;
+          font-weight: 700;
+          color: #303133;
+          margin-bottom: 12px;
         }
         
-        .group-stats {
+        .group-desc {
+          font-size: 18px;
+          color: #909399;
+          margin-bottom: 24px;
+        }
+        
+        .group-stats-large {
           display: flex;
-          gap: 16px;
-          margin-bottom: 16px;
+          justify-content: space-around;
+          margin-bottom: 24px;
+          padding: 20px;
+          background: #f5f7fa;
+          border-radius: 12px;
           
-          .stat-item {
-            flex: 1;
-            text-align: center;
-            padding: 8px;
-            background: #fafafa;
-            border-radius: 6px;
-            
+          .stat-large {
             .stat-label {
-              font-size: 12px;
+              font-size: 16px;
               color: #909399;
-              margin-bottom: 4px;
+              margin-bottom: 8px;
             }
             
             .stat-value {
-              font-size: 18px;
-              font-weight: 600;
+              font-size: 36px;
+              font-weight: 700;
               color: #303133;
+              
+              &.score {
+                &.excellent {
+                  color: #67c23a;
+                }
+                
+                &.good {
+                  color: #e6a23c;
+                }
+                
+                &.average {
+                  color: #f56c6c;
+                }
+              }
             }
           }
         }
         
-        .group-footer {
-          text-align: center;
+        .view-report-btn {
+          width: 100%;
+          height: 56px;
+          font-size: 20px;
+          font-weight: 600;
+          
+          .el-icon {
+            margin-right: 8px;
+          }
+        }
+      }
+    }
+  }
+}
+
+// 大型报告弹窗样式
+.large-report-dialog {
+  :deep(.el-dialog__body) {
+    padding: 0;
+    max-height: 85vh;
+    overflow-y: auto;
+  }
+  
+  .report-banner {
+    padding: 40px;
+    color: white;
+    
+    .banner-content {
+      .banner-title {
+        font-size: 48px;
+        font-weight: 700;
+        margin: 0 0 12px 0;
+      }
+      
+      .banner-subtitle {
+        font-size: 28px;
+        margin: 0 0 20px 0;
+        opacity: 0.95;
+      }
+      
+      .banner-meta {
+        display: flex;
+        gap: 30px;
+        font-size: 18px;
+        opacity: 0.9;
+        
+        span {
+          background: rgba(255, 255, 255, 0.2);
+          padding: 8px 16px;
+          border-radius: 6px;
         }
       }
     }
   }
   
-  .report-dialog {
-    :deep(.el-dialog__body) {
-      padding: 20px;
-      max-height: 75vh;
-      overflow-y: auto;
-    }
+  .report-body-body {
+    padding: 40px;
     
-    .report-access {
-      .report-card,
-      .ai-suggestion-card {
-        border-radius: 8px;
+    .report-section-large {
+      margin-bottom: 50px;
+      
+      .section-heading {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        font-size: 36px;
+        font-weight: 700;
+        color: #303133;
+        margin-bottom: 30px;
+        padding-bottom: 16px;
+        border-bottom: 3px solid #409eff;
+      }
+      
+      .subsection {
+        margin-bottom: 40px;
         
-        .report-header {
+        .subsection-title {
+          font-size: 28px;
+          font-weight: 600;
+          color: #409eff;
+          margin-bottom: 20px;
+          padding-left: 16px;
+          border-left: 4px solid #409eff;
+        }
+        
+        // 大表格样式
+        .large-table {
+          font-size: 18px;
+          
+          :deep(.el-table__header th) {
+            font-size: 20px;
+            font-weight: 600;
+            background: #f5f7fa;
+            padding: 16px 0;
+          }
+          
+          :deep(.el-table__body td) {
+            padding: 16px 0;
+            line-height: 1.8;
+          }
+          
+          .original-text {
+            color: #f56c6c;
+            font-weight: 500;
+          }
+          
+          .correct-text,
+          .corrected-text {
+            color: #67c23a;
+            font-weight: 600;
+          }
+          
+          .basis-content {
+            white-space: pre-line;
+            line-height: 2;
+          }
+          
+          .before-cell {
+            color: #f56c6c;
+            background: #fef0f0;
+            padding: 8px;
+            border-radius: 4px;
+          }
+          
+          .after-cell {
+            color: #67c23a;
+            background: #f0f9ff;
+            padding: 8px;
+            border-radius: 4px;
+          }
+        }
+        
+        // 对比表格特殊样式
+        .comparison-table {
+          :deep(.el-table__body tr:hover) {
+            background: #fafafa;
+          }
+        }
+        
+        // 总结卡片
+        .summary-card {
           display: flex;
           align-items: center;
-          gap: 8px;
-          font-size: 16px;
-          font-weight: 600;
-          color: #303133;
+          gap: 16px;
+          padding: 24px;
+          background: #fdf6ec;
+          border-left: 4px solid #e6a23c;
           
-          .el-icon {
-            font-size: 18px;
-            color: #409eff;
-          }
-        }
-      }
-      
-      .report-content {
-        .report-section {
-          margin-bottom: 24px;
-          
-          .section-title {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 16px;
-            font-weight: 600;
+          .summary-text {
+            font-size: 20px;
             color: #303133;
-            margin-bottom: 16px;
-            padding-bottom: 8px;
-            border-bottom: 2px solid #e4e7ed;
-            
-            .el-icon {
-              color: #409eff;
-            }
+            margin: 0;
+            line-height: 1.8;
           }
-          
-          .stat-box {
-            text-align: center;
-            padding: 16px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border-radius: 8px;
-            color: white;
-            
-            .stat-box-label {
-              font-size: 13px;
-              opacity: 0.9;
-              margin-bottom: 8px;
-            }
-            
-            .stat-box-value {
-              font-size: 28px;
-              font-weight: 700;
-              
-              &.success {
-                background: linear-gradient(135deg, #67c23a 0%, #85ce61 100%);
-              }
-              
-              &.warning {
-                background: linear-gradient(135deg, #e6a23c 0%, #ebb563 100%);
-              }
-            }
-          }
-          
-          .issue-meta {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-top: 8px;
-            
-            .frequency {
-              font-size: 12px;
-              color: #909399;
-            }
-          }
-        }
-      }
-      
-      .ai-suggestions {
-        .mb-4 {
-          margin-bottom: 16px;
         }
         
-        .suggestion-block {
-          margin-bottom: 24px;
+        // 影响卡片
+        .impact-card {
+          padding: 30px;
+          text-align: center;
+          height: 100%;
           
-          .block-title {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 15px;
-            font-weight: 600;
-            color: #303133;
-            margin-bottom: 12px;
-            
-            .el-icon {
-              color: #409eff;
-            }
+          .impact-icon {
+            margin-bottom: 20px;
+            color: #409eff;
           }
           
-          .block-content {
-            .score-breakdown {
-              margin-top: 16px;
-              
-              .score-item {
-                margin-bottom: 12px;
-                
-                span {
-                  display: block;
-                  font-size: 13px;
-                  color: #606266;
-                  margin-bottom: 6px;
-                }
-              }
-            }
+          h4 {
+            font-size: 24px;
+            font-weight: 600;
+            margin: 0 0 16px 0;
+            color: #303133;
+          }
+          
+          .impact-detail {
+            font-size: 18px;
+            color: #606266;
+            line-height: 1.8;
+            margin: 0 0 16px 0;
+          }
+          
+          .loss-amount {
+            font-size: 28px;
+            font-weight: 700;
+            color: #f56c6c;
+            padding: 12px;
+            background: #fef0f0;
+            border-radius: 8px;
+          }
+          
+          &.loss {
+            border-top: 4px solid #f56c6c;
+          }
+          
+          &.performance {
+            border-top: 4px solid #e6a23c;
+          }
+        }
+        
+        // 结论文字卡片
+        .conclusion-card {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+          padding: 24px;
+          background: #f0f9ff;
+          border-left: 4px solid #67c23a;
+          margin-top: 20px;
+          
+          .conclusion-text {
+            font-size: 20px;
+            color: #303133;
+            margin: 0;
+            line-height: 1.8;
+            font-weight: 500;
+          }
+        }
+        
+        // 建议卡片
+        .suggestion-card-large {
+          padding: 30px;
+          height: 100%;
+          position: relative;
+          
+          .suggestion-number {
+            position: absolute;
+            top: -10px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            font-weight: 700;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+          }
+          
+          h4 {
+            font-size: 24px;
+            font-weight: 600;
+            margin: 0 0 20px 0;
+            color: #303133;
+          }
+          
+          .suggestion-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
             
-            .suggestion-detail {
-              .suggestion-desc {
-                font-size: 13px;
-                color: #606266;
-                line-height: 1.8;
-                margin-bottom: 10px;
-              }
+            li {
+              font-size: 18px;
+              color: #606266;
+              line-height: 2;
+              margin-bottom: 12px;
+              padding-left: 24px;
+              position: relative;
               
-              .suggestion-actions {
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                
-                .impact {
-                  font-size: 12px;
-                  color: #67c23a;
-                  font-weight: 600;
-                }
-              }
-            }
-            
-            .resource-list {
-              list-style: none;
-              padding: 0;
-              margin: 0;
-              
-              li {
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                padding: 10px 0;
-                border-bottom: 1px solid #ebeef5;
-                
-                &:last-child {
-                  border-bottom: none;
-                }
-                
-                .resource-type {
-                  font-size: 12px;
-                  color: #909399;
-                  padding: 2px 8px;
-                  background: #f4f4f5;
-                  border-radius: 4px;
-                }
+              &::before {
+                content: '•';
+                position: absolute;
+                left: 8px;
+                color: #409eff;
+                font-weight: bold;
+                font-size: 24px;
               }
             }
           }
@@ -888,9 +901,67 @@ const handleExportReport = () => {
   }
 }
 
+// 响应式调整
 @media (max-width: 768px) {
   .group-quality-control {
-    padding: 10px;
+    .group-grid {
+      .group-card-large {
+        .group-content-large {
+          .group-icon {
+            width: 80px;
+            height: 80px;
+          }
+          
+          .group-title {
+            font-size: 24px;
+          }
+          
+          .group-stats-large {
+            flex-direction: column;
+            gap: 16px;
+          }
+        }
+      }
+    }
+  }
+  
+  .large-report-dialog {
+    .report-banner {
+      .banner-content {
+        .banner-title {
+          font-size: 32px;
+        }
+        
+        .banner-subtitle {
+          font-size: 20px;
+        }
+        
+        .banner-meta {
+          flex-direction: column;
+          gap: 12px;
+        }
+      }
+    }
+    
+    .report-body-body {
+      padding: 20px;
+      
+      .report-section-large {
+        .section-heading {
+          font-size: 28px;
+        }
+        
+        .subsection {
+          .subsection-title {
+            font-size: 22px;
+          }
+          
+          .large-table {
+            font-size: 14px;
+          }
+        }
+      }
+    }
   }
 }
 </style>
