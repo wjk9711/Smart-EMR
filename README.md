@@ -1,6 +1,31 @@
 # 电子病历系统 (EMR System)
 
-一个完整的电子病历管理系统,包含门诊、住院、质控、护理和后台管理五大模块。
+一个完整的电子病历管理系统，包含门诊、住院、质控、护理和后台管理五大模块。
+
+## 🚀 快速开始
+
+### 自动化部署（推荐）
+
+项目已提供完整的一键部署和更新脚本：
+
+```bash
+# 首次部署（服务器端）
+ssh root@your-server-ip
+chmod +x auto-update.sh
+sudo bash auto-update.sh
+
+# 日常更新
+bash quick-update.sh
+```
+
+详细文档请查看：
+- 📖 [QUICK_START.md](./QUICK_START.md) - 30秒快速开始
+- 📖 [自动化部署指南.md](./自动化部署指南.md) - 完整部署说明
+- 📖 [404错误快速修复.md](./404错误快速修复.md) - 常见问题解决
+
+### 手动启动（开发环境）
+
+详见 [GETTING_STARTED.md](./GETTING_STARTED.md)
 
 ## 项目概述
 
