@@ -66,8 +66,8 @@ PatientAssignment.init(
     indexes: [
       {
         fields: ['patientId', 'userId'],
-        unique: true,
-        name: 'unique_patient_user_assignment',
+        unique: false, // 移除唯一约束，允许重复下发
+        name: 'idx_patient_user',
       },
       {
         fields: ['userId'],

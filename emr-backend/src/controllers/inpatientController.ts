@@ -875,19 +875,8 @@ export const assignPatientsToAllUsers = async (req: AuthRequest, res: Response) 
       
       for (const originalPatient of patients) {
         for (const user of users) {
-          // 检查是否已经分配过
-          const existing = await PatientAssignment.findOne({
-            where: { 
-              patientId: originalPatient.id,
-              userId: user.id 
-            },
-            transaction,
-          })
-          
-          if (existing) {
-            console.log(`⚠️  患者 ${originalPatient.id} 已分配给用户 ${user.id}，跳过`)
-            continue // 已存在则跳过
-          }
+          // 注意：不再检查是否已分配过，允许重复下发
+          // 每次下发都创建新的副本患者和病案
           
           // 生成新的唯一住院号
           const newInpatientNo = await generateUniqueInpatientNo()
