@@ -869,22 +869,35 @@ export const assignPatientsToAllUsers = async (req: AuthRequest, res: Response) 
     const sequelize = require('../config/database').default
     const transaction = await sequelize.transaction()
     
+    console.log('=== 开始下发患者 ===')
+    console.log('患者IDs:', patientIds)
+    console.log('用户数量:', users.length)
+    console.log('isTemplate:', isTemplate)
+    
     try {
       let totalCopiedPatients = 0
       let totalCopiedRecords = 0
       
       for (const originalPatient of patients) {
+        console.log(`\n处理原始患者: ${originalPatient.id} (${originalPatient.name})`)
+        
         for (const user of users) {
+          console.log(`  → 下发给用户: ${user.id}`)
           // 注意：不再检查是否已分配过，允许重复下发
           // 每次下发都创建新的副本患者和病案
           
           // 生成新的唯一住院号
+          console.log(`    - 生成新住院号...`)
           const newInpatientNo = await generateUniqueInpatientNo()
+          console.log(`    - 新住院号: ${newInpatientNo}`)
           
           // 生成新的唯一KEY
+          console.log(`    - 生成患者唯一KEY...`)
           const newUniqueKey = await generateUniqueKey('inpatient_patients')
+          console.log(`    - 患者KEY: ${newUniqueKey}`)
           
           // 复制患者数据（完全独立，不记录来源）
+          console.log(`    - 创建副本患者...`)
           const copiedPatient = await InpatientPatient.create({
             name: originalPatient.name,
             gender: originalPatient.gender,

@@ -54,7 +54,7 @@ InpatientPatient.init(
     idCard: {
       type: DataTypes.STRING(18),
       allowNull: false,
-      unique: true,
+      // unique: true, // 移除唯一约束，允许不同用户拥有相同身份证号的患者副本
       comment: '身份证号',
     },
     phone: {

@@ -4,7 +4,21 @@
 
 ## 🚀 快速开始
 
-### 自动化部署（推荐）
+### Windows Server 2025 部署（新增）
+
+项目现已支持在 Windows Server 2025 数据中心版上部署：
+
+```powershell
+# 以管理员身份运行 PowerShell
+cd C:\emr-system
+.\deploy-windows-server.ps1
+```
+
+详细文档请查看：
+- 📖 [Windows_Server_2025_部署指南.md](./Windows_Server_2025_部署指南.md) - 完整部署说明
+- 📖 [Windows部署快速参考.md](./Windows部署快速参考.md) - 常用命令速查
+
+### Linux 自动化部署（推荐）
 
 项目已提供完整的一键部署和更新脚本：
 

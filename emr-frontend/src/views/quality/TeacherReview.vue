@@ -561,8 +561,23 @@ const hasDiagnosis = computed(() => {
         ? JSON.parse(currentRecord.value.content) 
         : currentRecord.value.content
       
-      // 检查是否有 diagnosis 字段
-      return !!(content.diagnosis || content.diagnoses)
+      // 检查多种可能的诊断字段
+      // 1. 直接 diagnosis/diagnoses 字段
+      if (content.diagnosis || content.diagnoses) return true
+      
+      // 2. 病案首页的出院诊断
+      if (content.homePage?.dischargeDiagnoses && content.homePage.dischargeDiagnoses.length > 0) return true
+      
+      // 3. 入院记录的入院诊断
+      if (content.admissionRecord?.admissionDiagnosis) return true
+      
+      // 4. 出院记录的出院诊断
+      if (content.dischargeRecord?.dischargeDiagnosis) return true
+      
+      // 5. 首次病程记录的初步诊断
+      if (content.progressRecord?.preliminaryDiagnosis) return true
+      
+      return false
     } catch {
       return false
     }
