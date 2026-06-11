@@ -28,7 +28,7 @@
         >
           <div class="group-content-large">
             <div class="group-icon" :style="{ background: group.color }">
-              <el-icon :size="60"><component :is="group.icon" /></el-icon>
+              {{ group.name.charAt(0) }}
             </div>
             <div class="group-title">{{ group.name }}</div>
             <div class="group-desc">{{ group.description }}</div>
@@ -75,8 +75,8 @@
 
         <!-- 报告主体内容 -->
         <div class="report-body-body">
-          <!-- 仁心仁术组：病案编码质控结果 -->
-          <div v-if="currentGroup.id === 1" class="report-section-large">
+          <!-- 仁心组、仁术组（reportType=1）：病案编码质控结果 -->
+          <div v-if="currentGroup.reportType === 1" class="report-section-large">
             <h2 class="section-heading">
               <el-icon :size="32"><CircleCheckFilled /></el-icon>
               二、病案编码质控结果
@@ -155,8 +155,8 @@
             </div>
           </div>
 
-          <!-- 精益求精组：DRG入组逻辑与结果分析 -->
-          <div v-if="currentGroup.id === 2" class="report-section-large">
+          <!-- 精益组、求精组（reportType=2）：DRG入组逻辑与结果分析 -->
+          <div v-if="currentGroup.reportType === 2" class="report-section-large">
             <h2 class="section-heading">
               <el-icon :size="32"><TrendCharts /></el-icon>
               三、DRG入组逻辑与结果分析
@@ -222,8 +222,8 @@
             </div>
           </div>
 
-          <!-- 开拓进取组：绩效影响与风险分析 + 质控改进建议 -->
-          <div v-if="currentGroup.id === 3" class="report-section-large">
+          <!-- 开拓组、进取组（reportType=3）：绩效影响与风险分析 + 质控改进建议 -->
+          <div v-if="currentGroup.reportType === 3" class="report-section-large">
             <h2 class="section-heading">
               <el-icon :size="32"><Monitor /></el-icon>
               四、绩效影响与风险分析
@@ -343,37 +343,73 @@ import {
   Money, Trophy, Check, MagicStick, Download
 } from '@element-plus/icons-vue'
 
-// 三个大组数据
+// 六个小组数据（复用三个报告模板）
 const groups = ref([
   {
     id: 1,
-    name: '仁心仁术组',
+    name: '仁心组',
     description: '病案编码质控专家',
     reportTitle: '二、病案编码质控结果',
-    icon: 'VerifiedUser',
-    memberCount: 14,
+    reportType: 1,  // 使用仁心仁术组的报告
+    icon: 'CircleCheckFilled',
+    memberCount: 7,
     score: 94.5,
     color: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
   },
   {
     id: 2,
-    name: '精益求精组',
+    name: '仁术组',
+    description: '病案编码质控专家',
+    reportTitle: '二、病案编码质控结果',
+    reportType: 1,  // 使用仁心仁术组的报告
+    icon: 'CircleCheckFilled',
+    memberCount: 7,
+    score: 93.8,
+    color: 'linear-gradient(135deg, #764ba2 0%, #667eea 100%)',
+  },
+  {
+    id: 3,
+    name: '精益组',
     description: 'DRG入组逻辑分析',
     reportTitle: '三、DRG入组逻辑与结果分析',
+    reportType: 2,  // 使用精益求精组的报告
     icon: 'TrendCharts',
-    memberCount: 14,
+    memberCount: 7,
     score: 91.2,
     color: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
   },
   {
-    id: 3,
-    name: '开拓进取组',
+    id: 4,
+    name: '求精组',
+    description: 'DRG入组逻辑分析',
+    reportTitle: '三、DRG入组逻辑与结果分析',
+    reportType: 2,  // 使用精益求精组的报告
+    icon: 'TrendCharts',
+    memberCount: 7,
+    score: 90.5,
+    color: 'linear-gradient(135deg, #f5576c 0%, #f093fb 100%)',
+  },
+  {
+    id: 5,
+    name: '开拓组',
     description: '绩效分析与改进建议',
     reportTitle: '四、绩效影响与风险分析 / 五、质控改进建议',
+    reportType: 3,  // 使用开拓进取组的报告
     icon: 'Monitor',
-    memberCount: 15,
+    memberCount: 7,
     score: 89.8,
     color: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+  },
+  {
+    id: 6,
+    name: '进取组',
+    description: '绩效分析与改进建议',
+    reportTitle: '四、绩效影响与风险分析 / 五、质控改进建议',
+    reportType: 3,  // 使用开拓进取组的报告
+    icon: 'Monitor',
+    memberCount: 8,
+    score: 88.9,
+    color: 'linear-gradient(135deg, #00f2fe 0%, #4facfe 100%)',
   },
 ])
 
@@ -571,6 +607,8 @@ const handleExportReport = () => {
           justify-content: center;
           margin: 0 auto 24px;
           color: white;
+          font-size: 56px;  // ✅ 增大字体
+          font-weight: 700;  // ✅ 加粗
           box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
         }
         
@@ -910,6 +948,7 @@ const handleExportReport = () => {
           .group-icon {
             width: 80px;
             height: 80px;
+            font-size: 40px;  // ✅ 响应式字体
           }
           
           .group-title {
