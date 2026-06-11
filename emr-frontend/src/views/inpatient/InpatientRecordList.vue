@@ -11,6 +11,10 @@
             <span class="title">病案列表 - {{ patientName }}</span>
           </div>
           <div class="header-actions" v-if="patientId">
+            <el-button type="warning" @click="handleOpenDRG">
+              <el-icon><Link /></el-icon>
+              DRG入组
+            </el-button>
             <el-button type="success" @click="handlePreviewAll" :disabled="recordList.length === 0">
               <el-icon><View /></el-icon>
               预览全部病案
@@ -336,7 +340,7 @@
 import { ref, reactive, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowLeft, Plus, Delete, Check, ArrowDown, View, Printer } from '@element-plus/icons-vue'
+import { ArrowLeft, Plus, Delete, Check, ArrowDown, View, Printer, Link } from '@element-plus/icons-vue'
 import { getInpatientRecords, deleteInpatientRecord, submitRecord, getTeacherList } from '@/api/inpatient'
 import InpatientRecordForm from './InpatientRecordForm.vue'
 import HomePageForm from './HomePageForm.vue'
@@ -532,6 +536,12 @@ const handleCreate = () => {
   }
   currentRecord.value = null
   dialogVisible.value = true
+}
+
+// 预览全部病案
+// 打开DRG入组系统
+const handleOpenDRG = () => {
+  window.open('https://chs-drg.fivesoft.com.cn/2.0/', '_blank')
 }
 
 // 预览全部病案
